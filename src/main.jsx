@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   Activity, ArrowDownUp, ArrowRight, AudioLines, Check, ChevronDown,
@@ -8,7 +8,7 @@ import {
   Sparkles, X, Zap,
 } from 'lucide-react';
 import './styles.css';
-import { isPcBuildIntent } from '../shared/request.js';
+import { interpretRequest, isPcBuildIntent } from '../shared/request.js';
 
 const CATEGORIES = [
   { label: 'Todos os produtos', slug: 'todos', Icon: House },
@@ -46,14 +46,8 @@ async function api(path, options = {}) {
 function BrandMark({ className = '' }) {
   return (
     <div className={'brand-lockup ' + className}>
-      <span className="brand-symbol" aria-hidden="true">
-        <svg viewBox="0 0 42 42" width="34" height="34" fill="none">
-          <path d="M21 3.5 36.2 12v17L21 37.5 5.8 29V12L21 3.5Z" fill="currentColor" />
-          <path d="M10.5 18.7c4-3.7 9.9-4.7 16-3.1l5.8 2-4 1.3 5 2.1-4 1.4a17 17 0 0 1-14.9 1l-4.9-2.2 4.6-1.6-3.6-.9Z" fill="white" />
-          <path d="m27 9 8 1.6-6.6 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </span>
-      <span className="brand-words"><strong>SETUP</strong><b>NINJA</b></span>
+      <picture><source media="(max-width: 570px)" srcSet="/assets/setupninja-logo-white-mobile.webp" />
+        <img className="brand-logo" src="/assets/setupninja-logo-white.webp" alt="" /></picture>
     </div>
   );
 }
@@ -123,7 +117,7 @@ function OperatorBar({ active, onChange, session }) {
   );
 }
 
-function Header({ onSearch, onAssistant, cartCount }) {
+function Header({ onSearch, onCart, cartCount }) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <>
@@ -155,7 +149,7 @@ function Header({ onSearch, onAssistant, cartCount }) {
             <span className="utility-icon"><ShieldCheck size={18} /></span>
             <span>Bem-vindo ninja <strong>Minha conta</strong></span>
           </div>
-          <button className="utility-item cart-utility" onClick={onAssistant}>
+          <button className="utility-item cart-utility" onClick={onCart} aria-label={`Abrir carrinho com ${cartCount} itens`}>
             <span className="utility-icon cart-icon"><ShoppingBag size={19} /><i>{cartCount}</i></span>
             <span>Seu carrinho <strong>Ver sacola</strong></span>
           </button>
@@ -172,7 +166,7 @@ function Header({ onSearch, onAssistant, cartCount }) {
           <a href="#vitrine">Monitores</a>
           <a href="#vitrine">Novidades</a>
           <a href="#vitrine">Ofertas</a>
-          <button className="build-pc-link" onClick={onAssistant}><Cpu size={15} /> MONTE SEU PC <ArrowRight size={13} /></button>
+          <button className="build-pc-link" onClick={() => window.dispatchEvent(new Event('open-pc-builder'))}><Cpu size={15} /> MONTE SEU PC <ArrowRight size={13} /></button>
         </div>
         {menuOpen ? (
           <div className="department-flyout">
@@ -301,10 +295,10 @@ function ProductCard({ product, index, onAdd }) {
             ) : null}
           </>
         ) : <p className="no-price">Preço individual não encontrado</p>}
-        <button className="add-cart" onClick={() => onAdd(product)}>
-          <ShoppingBag size={15} />
-          {Number.isFinite(product.price_brl) ? 'Colocar no carrinho' : 'Ver opções na loja'}
-        </button>
+        {Number.isFinite(product.price_brl) && Number.isFinite(product.stock_quantity) && product.stock_quantity > 0 ? <button className="add-cart" onClick={() => onAdd(product)}><ShoppingBag size={15} /> Colocar no carrinho</button>
+          : /^https:\/\/(?:www\.)?setupninja\.com\.br\//i.test(product.product_url || '')
+            ? <a className="add-cart" href={product.product_url} target="_blank" rel="noreferrer">Ver na loja oficial <ArrowRight size={13} /></a>
+            : <button className="add-cart" disabled title={Number.isFinite(product.price_brl) ? 'Este item não tem estoque disponível no catálogo' : 'Este item não tem preço individual no catálogo'}>{Number.isFinite(product.price_brl) ? 'Sem estoque disponível' : 'Preço indisponível'}</button>}
       </div>
     </article>
   );
@@ -792,67 +786,198 @@ function Footer() {
   );
 }
 
-function PcBuilder() {
+function CartDrawer({ items, onChangeQuantity, onRemove, onClose }) {
+  const closeButton = useRef(null);
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = items.reduce((sum, item) => sum + item.price_brl * item.quantity, 0);
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    const focusable = '.cart-drawer button:not(:disabled), .cart-drawer a[href], .cart-drawer input:not(:disabled), .cart-drawer select:not(:disabled), .cart-drawer textarea:not(:disabled), .cart-drawer [tabindex]:not([tabindex="-1"])';
+    const trapFocus = (event) => {
+      if (event.key !== 'Tab') return;
+      const elements = [...document.querySelectorAll(focusable)].filter((element) => element.getClientRects().length);
+      if (!elements.length) { event.preventDefault(); return; }
+      const first = elements[0];
+      const last = elements.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.body.style.overflow = 'hidden';
+    closeButton.current?.focus();
+    document.addEventListener('keydown', trapFocus);
+    return () => {
+      document.removeEventListener('keydown', trapFocus);
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus?.();
+    };
+  }, []);
+  return (
+    <div className="cart-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <aside className="cart-drawer" role="dialog" aria-modal="true" aria-labelledby="cart-title">
+        <header className="cart-drawer-head"><div><span>SACOLA DA VITRINE</span><h2 id="cart-title">Seu carrinho <small>({itemCount})</small></h2></div>
+          <button ref={closeButton} aria-label="Fechar carrinho" onClick={onClose}><X size={19} /></button></header>
+        {items.length ? <>
+          <div className="cart-items">{items.map((item) => <article className="cart-line" key={item.id}>
+            {item.image_url ? <img src={item.image_url} alt="" loading="lazy" /> : <span className="cart-line-placeholder"><ShoppingBag size={19} /></span>}
+            <div className="cart-line-info"><span>{item.category}</span><strong>{item.name}</strong><small>{compactMoney(item.price_brl)} por unidade</small>
+              <div className="cart-quantity" aria-label={`Quantidade de ${item.name}`}>
+                <button onClick={() => onChangeQuantity(item.id, item.quantity - 1)} aria-label="Diminuir quantidade"><span aria-hidden="true">−</span></button>
+                <b>{item.quantity}</b>
+                <button onClick={() => onChangeQuantity(item.id, item.quantity + 1)} disabled={item.quantity >= item.stock_quantity} aria-label="Aumentar quantidade"><span aria-hidden="true">+</span></button>
+                <button className="cart-remove" onClick={() => onRemove(item.id)}>Remover</button>
+              </div>
+            </div>
+            <b className="cart-line-total">{compactMoney(item.price_brl * item.quantity)}</b>
+          </article>)}</div>
+          <div className="cart-summary"><div><span>Subtotal do catálogo</span><strong>{compactMoney(totalPrice)}</strong></div>
+            <p>Prévia demonstrativa. Preços e estoque são os consultados no catálogo; esta vitrine não processa pedidos nem pagamento.</p>
+            <button onClick={onClose}>Continuar explorando <ArrowRight size={15} /></button>
+          </div>
+        </> : <div className="cart-empty"><ShoppingBag size={30} /><strong>Sua sacola está vazia.</strong><p>Adicione produtos individuais com preço publicado para comparar o total.</p><button onClick={onClose}>Explorar produtos</button></div>}
+      </aside>
+    </div>
+  );
+}
+
+const BUILD_CATEGORIES = [
+  { key: 'processor', label: 'Processador', slug: 'processadores' },
+  { key: 'motherboard', label: 'Placa-mãe', slug: 'placas-mae' },
+  { key: 'memory', label: 'Memória', slug: 'memoria-ram' },
+  { key: 'graphicsCard', label: 'Placa de vídeo', slug: 'placas-de-video' },
+  { key: 'powerSupply', label: 'Fonte', slug: 'fontes' },
+  { key: 'case', label: 'Gabinete', slug: 'gabinetes' },
+  { key: 'storage', label: 'Armazenamento', slug: 'armazenamento' },
+  { key: 'cooler', label: 'Cooler', slug: 'coolers-para-processador' },
+];
+
+function PcBuilder({ isActive, onAddProposal }) {
   const [options, setOptions] = useState(null);
+  const [partOptions, setPartOptions] = useState({});
+  const [loadingOptions, setLoadingOptions] = useState(false);
+  const [retryOptions, setRetryOptions] = useState(0);
   const [budget, setBudget] = useState('5000');
   const [memoryGB, setMemoryGB] = useState('32');
-  const [request, setRequest] = useState('PC gamer para jogos em 1440p');
-  const [dedicatedGpu, setDedicatedGpu] = useState(true);
+  const [request, setRequest] = useState('PC para uso geral');
+  const [dedicatedGpu, setDedicatedGpu] = useState(false);
   const [gpuId, setGpuId] = useState('');
   const [cpuVendor, setCpuVendor] = useState('');
   const [result, setResult] = useState(null);
+  const [pendingParts, setPendingParts] = useState({});
+  const [draftChanged, setDraftChanged] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  useEffect(() => { api('/api/build/options').then(setOptions).catch((reason) => setError(reason.message)); }, []);
-  async function submit(event, previousBuildId = '') {
+  useEffect(() => {
+    if (!isActive || options) return undefined;
+    let mounted = true;
+    setLoadingOptions(true);
+    const load = async () => {
+      const buildOptions = await api('/api/build/options');
+      if (buildOptions.parts) return { buildOptions, parts: buildOptions.parts };
+      const catalogs = await Promise.all(BUILD_CATEGORIES.map(({ slug }) => api(`/api/catalog?limit=120&category=${slug}`)));
+      return { buildOptions, parts: Object.fromEntries(BUILD_CATEGORIES.map(({ key }, index) => [key, catalogs[index].rows])) };
+    };
+    load().then(({ buildOptions, parts }) => {
+      if (!mounted) return;
+      setOptions(buildOptions);
+      setPartOptions(Object.fromEntries(BUILD_CATEGORIES.map(({ key }) => [key, (parts[key] || []).map((item) => ({
+        ...item, price_brl: Number(item.price_brl ?? Number(item.priceCents) / 100),
+        stock_quantity: Number(item.stock_quantity ?? item.stockQuantity), image_url: item.image_url || item.imageUrl || '',
+      }))])));
+    }).catch((reason) => { if (mounted) setError(reason.message); })
+      .finally(() => { if (mounted) setLoadingOptions(false); });
+    return () => { mounted = false; };
+  }, [isActive, options, retryOptions]);
+  async function submit(event, previousBuildId = result?.buildId || '') {
     event?.preventDefault();
     setLoading(true); setError('');
     try {
       const next = await api('/api/build', { method: 'POST', body: JSON.stringify({ budget: Number(budget), memoryGB: Number(memoryGB), request,
-        dedicatedGpu, gpuId: gpuId || undefined, cpuVendor: cpuVendor || undefined, previousBuildId: previousBuildId || undefined }) });
+        dedicatedGpu, gpuId: gpuId || undefined, cpuVendor: cpuVendor || undefined, previousBuildId: previousBuildId || undefined,
+        requiredParts: Object.keys(pendingParts).length ? pendingParts : undefined }) });
       setResult(next);
+      setPendingParts({});
+      setDraftChanged(false);
     } catch (reason) { setError(reason.message); }
     finally { setLoading(false); }
   }
   const selected = result?.selected;
+  const pickedByCategory = Object.fromEntries(BUILD_CATEGORIES.map(({ key, label }) => [label, key]));
+  const completion = selected?.items.length || 0;
+  const validatedBudget = Number(result?.telemetry?.budgetCents) / 100 || Number(budget || 0);
+  const budgetUsage = validatedBudget > 0 ? Math.min(100, Math.round(selected?.totalPriceCents / 100 / validatedBudget * 100)) : 0;
+  const partById = (key, id) => partOptions[key]?.find((item) => String(item.id) === String(id));
+  const choicesFor = (key) => {
+    const inventory = key === 'processor' ? options?.cpus : key === 'graphicsCard' ? options?.gpus : null;
+    return partOptions[key]?.length ? partOptions[key] : inventory?.map((item) => ({ id: item.id, name: item.name, price_brl: item.priceCents / 100 })) || [];
+  };
+  const selectedCpuId = selected?.items.find((item) => item.category === 'Processador')?.id || '';
+  const selectedGpuId = selected?.items.find((item) => item.category === 'Placa de vídeo')?.id || '';
+  const mustKeepGpu = Boolean(selectedGpuId)
+    || ['gaming', 'workstation'].includes(interpretRequest(request).purpose)
+    || /placa\s+de\s+v[ií]deo|gpu|dedicad[ao]|geforce|radeon|\b(?:rtx|gtx|rx)\s*\d/i.test(request);
+  const proposalCartItems = (selected?.items || []).map((part) => {
+    const key = pickedByCategory[part.category];
+    const catalogPart = key && partById(key, part.id);
+    const quantity = Math.max(1, Math.trunc(Number(part.quantity) || 1));
+    const stock = Math.trunc(Number(part.stockQuantity ?? catalogPart?.stock_quantity));
+    const unitCents = Number(part.unitPriceCents);
+    const totalCents = Number(part.totalPriceCents);
+    if (!catalogPart || !Number.isFinite(stock) || stock < quantity || !Number.isFinite(unitCents) || unitCents < 0
+      || !Number.isFinite(totalCents) || totalCents !== unitCents * quantity) return null;
+    return { id: String(part.id), name: part.name, category: part.category,
+      price_brl: unitCents / 100, image_url: catalogPart.image_url || '', stock_quantity: stock, quantity };
+  }).filter(Boolean);
+  const canAddProposal = Boolean(selected && !draftChanged && !loading && proposalCartItems.length === selected.items.length);
   return (
     <section className="pc-builder" aria-labelledby="builder-title">
-      <div className="builder-intro"><span className="section-overline"><span />MONTAGEM BASEADA NO ESTOQUE REAL</span>
-        <h1 id="builder-title">Monte seu PC<br /><em>sem comprar no escuro.</em></h1>
-        <p>Peças, preços e estoque vêm do configurador oficial. Regras determinísticas filtram conflitos conhecidos; dados que faltam aparecem como incertezas.</p>
+      <div className="builder-intro"><span className="section-overline"><span />MONTAGEM A PARTIR DO CATÁLOGO OFICIAL</span>
+        <h1 id="builder-title">Monte seu PC<br /><em>com cada escolha à vista.</em></h1>
+        <p>Defina seu objetivo e orçamento. Depois, troque uma peça por vez; cada combinação volta ao validador de estoque e compatibilidade.</p>
       </div>
       <div className="builder-layout">
         <form className="builder-form" onSubmit={submit}>
-          <label>Seu pedido<textarea value={request} onChange={(event) => setRequest(event.target.value)} rows="3" maxLength="900" placeholder="Ex.: Ryzen 7 com RTX 5070 e 32 GB de RAM" /></label>
+          <div className="builder-form-title"><span>COMECE PELO OBJETIVO</span><strong>O que você quer montar?</strong></div>
+          <label>Uso principal<textarea value={request} onChange={(event) => { setRequest(event.target.value); setDraftChanged(true); }} rows="2" maxLength="900" placeholder="Ex.: PC para jogar em 1440p, editar vídeo ou uso geral" /></label>
           <div className="builder-fields">
-            <label>Limite de preço (R$)<input inputMode="decimal" type="number" min="100" step="100" value={budget} onChange={(event) => setBudget(event.target.value)} required /></label>
-            <label>Memória desejada<select value={memoryGB} onChange={(event) => setMemoryGB(event.target.value)}><option value="16">16 GB</option><option value="32">32 GB</option><option value="64">64 GB</option></select></label>
+            <label>Orçamento máximo<input inputMode="decimal" type="number" min="100" step="100" value={budget} onChange={(event) => { setBudget(event.target.value); setDraftChanged(true); }} required /><small>Valores em reais</small></label>
+            <label>Memória desejada<select value={memoryGB} onChange={(event) => { setMemoryGB(event.target.value); setDraftChanged(true); }}><option value="16">16 GB</option><option value="32">32 GB</option><option value="64">64 GB</option></select></label>
           </div>
           <div className="builder-fields">
-            <label>Plataforma de CPU<select value={cpuVendor} onChange={(event) => setCpuVendor(event.target.value)}><option value="">Sem preferência</option><option value="amd">AMD</option><option value="intel">Intel</option></select></label>
-            <label>Placa de vídeo<select value={gpuId} onChange={(event) => { setGpuId(event.target.value); if (event.target.value) setDedicatedGpu(true); }} disabled={!options}><option value="">Qualquer modelo cabível</option>{options?.gpus.map((gpu) => <option key={gpu.id} value={gpu.id}>{gpu.name} · {money.format(gpu.priceCents / 100)}</option>)}</select></label>
+            <label>Processador<select value={pendingParts.processor ?? selectedCpuId} onChange={(event) => { setPendingParts((current) => ({ ...current, processor: event.target.value })); setDraftChanged(true); }} disabled={!options}><option value="">Sugestão automática</option>{choicesFor('processor').map((cpu) => <option key={cpu.id} value={cpu.id}>{cpu.name} · {compactMoney(cpu.price_brl)}</option>)}</select></label>
+            <label>Marca do processador<select value={cpuVendor} onChange={(event) => { setCpuVendor(event.target.value); setDraftChanged(true); }}><option value="">Sem preferência</option><option value="amd">AMD</option><option value="intel">Intel</option></select></label>
           </div>
-          <label className="builder-check"><input type="checkbox" checked={dedicatedGpu} onChange={(event) => setDedicatedGpu(event.target.checked)} /> Incluir placa de vídeo dedicada</label>
-          <button className="builder-submit" disabled={loading || !options}>{loading ? 'CHECANDO O CATÁLOGO…' : 'MONTAR UMA SUGESTÃO'} <ArrowRight size={16} /></button>
+          <label>Placa de vídeo<select value={pendingParts.graphicsCard ?? (selectedGpuId || gpuId)} onChange={(event) => { setPendingParts((current) => ({ ...current, graphicsCard: event.target.value })); setGpuId(event.target.value); if (event.target.value) setDedicatedGpu(true); setDraftChanged(true); }} disabled={!options}><option value="">{dedicatedGpu ? 'Qualquer opção validada' : 'Sem placa dedicada'}</option>{choicesFor('graphicsCard').map((gpu) => <option key={gpu.id} value={gpu.id}>{gpu.name} · {compactMoney(gpu.price_brl)}</option>)}</select></label>
+          <label className="builder-check"><input type="checkbox" checked={dedicatedGpu || mustKeepGpu} disabled={mustKeepGpu} onChange={(event) => { setDedicatedGpu(event.target.checked); setDraftChanged(true); if (!event.target.checked) { setGpuId(''); setPendingParts((current) => { const next = { ...current }; delete next.graphicsCard; return next; }); } }} /> Incluir placa de vídeo dedicada</label>
+          {mustKeepGpu ? <small className="builder-gpu-note">Este pedido ou a proposta atual pede uma placa dedicada. Para começar uma montagem sem GPU dedicada, use “Nova montagem”.</small> : null}
+          <button className="builder-submit" disabled={loading || loadingOptions || !options}>{loading ? 'VALIDANDO PEÇAS…' : loadingOptions ? 'CARREGANDO CATÁLOGO…' : result ? 'ATUALIZAR SUGESTÃO' : 'MONTAR MINHA SUGESTÃO'} <ArrowRight size={16} /></button>
           {error ? <p className="builder-error" role="alert">{error}</p> : null}
-          <small>Sem conexão de modelo, o montador determinístico continua funcionando. Nenhuma opção ultrapassa o teto enviado.</small>
+          {!options && !loadingOptions && error ? <button className="builder-options-retry" type="button" onClick={() => { setError(''); setRetryOptions((attempt) => attempt + 1); }}>Tentar carregar as peças novamente</button> : null}
+          <small>{loadingOptions ? 'Buscando opções disponíveis no catálogo oficial…' : 'Usamos SKUs disponíveis da loja. Preços e estoque podem mudar; o resultado não inicia uma compra.'}</small>
         </form>
         <div className="builder-result" aria-live="polite">
           {selected ? <>
-            <div className="builder-result-head"><span className={'compat-badge status-' + selected.compatibility.status.toLowerCase()}><ShieldCheck size={14} /> Compatibilidade {selected.compatibility.status}</span>
-              <strong>{money.format(selected.totalPriceCents / 100)}</strong><small>total dos itens selecionados</small></div>
+            {draftChanged ? <div className="builder-pending-note" role="status">Há mudanças no pedido. Abaixo está a última proposta validada; atualize para conferir os novos SKUs e o orçamento.</div> : null}
+            <button type="button" className="builder-reset" onClick={() => { setResult(null); setRequest('PC para uso geral'); setDedicatedGpu(false); setGpuId(''); setPendingParts({}); setDraftChanged(false); setError(''); }}>Nova montagem</button>
+            <div className="builder-result-head"><div className="builder-result-label"><span className="builder-status-dot" /><span>PROPOSTA VALIDADA NO CATÁLOGO</span></div>
+              <strong>{money.format(selected.totalPriceCents / 100)}</strong><small>de até {money.format(validatedBudget)} · {Math.max(0, validatedBudget - selected.totalPriceCents / 100) > 0 ? `${money.format(validatedBudget - selected.totalPriceCents / 100)} livres` : 'orçamento utilizado'}</small>
+              <span className={'compat-badge status-' + selected.compatibility.status.toLowerCase()}><ShieldCheck size={14} /> Compatibilidade {selected.compatibility.status}</span></div>
+            <div className="builder-progress" aria-label={`${budgetUsage}% do orçamento usado`}><span><b>{completion}</b> SKUs na proposta <small>{budgetUsage}% do orçamento usado</small></span><div><i style={{ width: `${budgetUsage}%` }} /></div></div>
             <p className="builder-copy">{selected.explanation}</p>
             <div className="builder-parts">{selected.items.map((part) => <article key={part.id}>
+              {partById(pickedByCategory[part.category], part.id)?.image_url ? <img className="builder-part-image" src={partById(pickedByCategory[part.category], part.id).image_url} alt="" loading="lazy" /> : <span className="builder-part-placeholder"><Cpu size={17} /></span>}
               <div><span>{part.category}{part.quantity > 1 ? ` · ${part.quantity} unidades` : ''}</span><strong>{part.name}</strong>
-                <small>Estoque consultado: {part.stockQuantity} · ID {part.id}</small></div>
+                <small>SKU {part.id} · {part.stockQuantity} em estoque no momento da consulta</small></div>
               <b>{money.format(part.totalPriceCents / 100)}</b>
+              {pickedByCategory[part.category] && choicesFor(pickedByCategory[part.category]).length ? <label className="builder-swap">Trocar<select aria-label={`Trocar ${part.category}`} value={pendingParts[pickedByCategory[part.category]] || part.id} onChange={(event) => { setPendingParts((current) => ({ ...current, [pickedByCategory[part.category]]: event.target.value })); setDraftChanged(true); }}><option value={part.id}>Manter selecionado</option>{choicesFor(pickedByCategory[part.category]).filter((item) => String(item.id) !== String(part.id)).map((item) => <option key={item.id} value={item.id}>{item.name} · {compactMoney(item.price_brl)}</option>)}</select></label> : null}
             </article>)}</div>
-            {selected.unknownRules.length ? <div className="builder-unknown"><strong>Dados que faltam na loja</strong><p>{selected.unknownRules.join(' · ')}. Isso não é confirmação de encaixe; valide esses pontos antes da compra.</p></div> : null}
-            <div className="builder-audit"><span>Decisão: {result.decision.provider} · {result.decision.model}{result.decision.fallback ? ' (fallback)' : ''}</span>
-              <span>Explicação: {result.generation.called ? result.generation.provider + ' · ' + result.generation.model : 'prévia local; sem modelo conectado'}</span>
-              <span>Catálogo: fonte oficial · {result.telemetry.durationMs} ms</span></div>
+            {selected.unknownRules.length ? <div className="builder-unknown"><strong>Itens que precisam de conferência</strong><p>{selected.unknownRules.join(' · ')}. Compatibilidade sem dados suficientes continua desconhecida; consulte as especificações antes de comprar.</p></div> : null}
+            {result.refinement?.changedParts?.length ? <p className="builder-change-note">Após validar as trocas, o montador ajustou {result.refinement.changedParts.join(', ')} para manter a proposta viável. Confira os SKUs acima.</p> : null}
+            <div className="builder-audit"><span>Seleção: {result.decision.provider === 'deterministic' ? 'regras do montador' : result.decision.provider} · {result.decision.model}</span><span>Fonte e estoque: catálogo oficial Monte seu PC · consultado agora</span></div>
             {result.candidates.length > 1 ? <details className="builder-alternatives"><summary>{result.candidates.length - 1} outras opções viáveis</summary>{result.candidates.slice(1).map((candidate) => <div key={candidate.id}><span>{candidate.items[0]?.name} · {candidate.items.find((item) => item.category === 'Placa de vídeo')?.name || 'vídeo integrado'}</span><b>{money.format(candidate.totalPriceCents / 100)}</b></div>)}</details> : null}
-            <button className="builder-refine" onClick={(event) => submit(event, result.buildId)}>Trocar uma peça mantendo o restante <ArrowRight size={14} /></button>
+            <button type="button" className="builder-add-cart" onClick={() => onAddProposal(proposalCartItems)} disabled={!canAddProposal}><ShoppingBag size={16} />Adicionar SKUs à sacola demonstrativa</button>
+            {draftChanged ? <small className="builder-cart-hint">Valide as alterações antes de adicionar esta proposta à sacola.</small> : null}
+            <button className="builder-refine" onClick={(event) => submit(event, result.buildId)} disabled={loading || !Object.keys(pendingParts).length}>{loading ? 'VALIDANDO COMBINAÇÃO…' : Object.keys(pendingParts).length ? 'Validar trocas e atualizar' : 'Selecione uma peça acima para trocar'} <ArrowRight size={14} /></button>
           </> : <div className="builder-empty"><Cpu size={38} /><strong>Uma lista de peças, com as contas na mesa.</strong><p>O resultado inclui evidências, estoque por SKU e limites que o catálogo não permite confirmar.</p></div>}
         </div>
       </div>
@@ -873,8 +998,24 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [notice, setNotice] = useState('');
-  const [cart, setCart] = useState(0);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [cart, setCart] = useState(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem('setupninja-demo-cart') || '[]');
+      if (!Array.isArray(saved)) return [];
+      return saved.filter((item) => item && typeof item.id === 'string' && typeof item.name === 'string'
+        && Number.isFinite(item.price_brl) && item.price_brl >= 0 && Number.isFinite(item.stock_quantity) && item.stock_quantity > 0)
+        .slice(0, 80).map((item) => ({ ...item,
+          stock_quantity: Math.max(1, Math.trunc(item.stock_quantity)),
+          quantity: Math.min(Math.max(1, Math.trunc(Number(item.quantity) || 1)), Math.max(1, Math.trunc(item.stock_quantity))) }));
+    } catch { return []; }
+  });
   const [view, setView] = useState('store');
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  useEffect(() => {
+    try { window.localStorage.setItem('setupninja-demo-cart', JSON.stringify(cart)); } catch { /* storage can be disabled */ }
+  }, [cart]);
 
   async function refreshSession() {
     try { setSession(await api('/api/session')); }
@@ -883,8 +1024,17 @@ function App() {
   useEffect(() => {
     refreshSession();
     const onSelect = (event) => setPanel(event.detail);
+    const onBuilder = () => {
+      setPanel('');
+      setView('builder');
+      window.setTimeout(() => document.querySelector('.store-view-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0);
+    };
     window.addEventListener('select-inspector', onSelect);
-    return () => window.removeEventListener('select-inspector', onSelect);
+    window.addEventListener('open-pc-builder', onBuilder);
+    return () => {
+      window.removeEventListener('select-inspector', onSelect);
+      window.removeEventListener('open-pc-builder', onBuilder);
+    };
   }, []);
   useEffect(() => {
     let active = true;
@@ -904,7 +1054,7 @@ function App() {
   }, [category, query, sort]);
   useEffect(() => {
     const onKey = (event) => {
-      if (event.key === 'Escape') { setPanel(''); setChatOpen(false); }
+      if (event.key === 'Escape') { setPanel(''); setChatOpen(false); setCartOpen(false); }
       if (event.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
         event.preventDefault();
         document.querySelector('.store-search input')?.focus();
@@ -927,26 +1077,61 @@ function App() {
     document.getElementById('vitrine')?.scrollIntoView({ behavior: 'smooth' });
   }
   function addToCart(product) {
-    if (!Number.isFinite(product.price_brl)) {
-      setNotice('Esse item apareceu dentro de um computador completo. Confira o conjunto na loja.');
+    if (!Number.isFinite(product.price_brl) || !Number.isFinite(product.stock_quantity) || product.stock_quantity <= 0) {
+      setNotice(Number.isFinite(product.price_brl) ? 'Esse item não tem estoque disponível no catálogo.' : 'Esse item não tem preço individual publicado.');
       return;
     }
-    setCart((count) => count + 1);
+    const stock = Math.trunc(Number(product.stock_quantity));
+    setCart((items) => {
+      const existing = items.find((item) => item.id === String(product.id));
+      if (existing) return items.map((item) => item.id === existing.id ? { ...item, quantity: Math.min(item.quantity + 1, stock) } : item);
+      return [...items, { id: String(product.id), name: product.name, category: product.category, price_brl: product.price_brl,
+        image_url: product.image_url || '', stock_quantity: stock, quantity: 1 }];
+    });
+    setCartOpen(true);
     setNotice(product.name.slice(0, 52) + ' adicionado à sua sacola.');
   }
+  function addProposalToCart(proposal) {
+    if (!proposal.length) return;
+    setCart((items) => {
+      const next = [...items];
+      proposal.forEach((product) => {
+        const id = String(product.id);
+        const stock = Math.max(1, Math.trunc(Number(product.stock_quantity) || 1));
+        const quantity = Math.min(stock, Math.max(1, Math.trunc(Number(product.quantity) || 1)));
+        const index = next.findIndex((item) => item.id === id);
+        const existing = next[index];
+        if (existing) {
+          next[index] = { ...existing, quantity: Math.min(stock, existing.quantity + quantity), stock_quantity: stock };
+        } else {
+          next.push({ id, name: product.name, category: product.category, price_brl: product.price_brl,
+            image_url: product.image_url || '', stock_quantity: stock, quantity });
+        }
+      });
+      return next;
+    });
+    setCartOpen(true);
+    setNotice(`${proposal.length} SKUs da proposta adicionados à sacola demonstrativa.`);
+  }
+  function changeCartQuantity(id, quantity) {
+    const wholeQuantity = Math.trunc(Number(quantity));
+    setCart((items) => items.flatMap((item) => item.id !== id ? [item]
+      : wholeQuantity <= 0 ? [] : [{ ...item, quantity: Math.min(wholeQuantity, item.stock_quantity) }]));
+  }
+  function removeCartItem(id) { setCart((items) => items.filter((item) => item.id !== id)); }
   function selectedLabel() { return CATEGORIES.find((item) => item.slug === category)?.label || category; }
 
   return (
     <div className="application-shell">
       <OperatorBar active={panel} onChange={setPanel} session={session} />
-      <Header onSearch={setQuery} onAssistant={() => setChatOpen(true)} cartCount={cart} />
+      <Header onSearch={setQuery} onCart={() => setCartOpen(true)} cartCount={cartCount} />
       <main>
         <div className="store-main">
           <div className="store-view-tabs" role="tablist" aria-label="Área da demonstração">
             <button role="tab" aria-selected={view === 'store'} className={view === 'store' ? 'active' : ''} onClick={() => setView('store')}>Loja e catálogo</button>
             <button role="tab" aria-selected={view === 'builder'} className={view === 'builder' ? 'active' : ''} onClick={() => setView('builder')}>Monte seu PC <Cpu size={15} /></button>
           </div>
-          {view === 'builder' ? <PcBuilder /> : <>
+          {view === 'builder' ? null : <>
           <nav className="breadcrumb" aria-label="Navegação estrutural">
             <a href="#inicio">Início</a><ChevronRight size={12} /><span>O marketplace do seu próximo setup</span>
             {query ? <><ChevronRight size={12} /><strong>{query}</strong><button onClick={() => setQuery('')} aria-label="Limpar busca"><X size={12} /></button></> : null}
@@ -995,12 +1180,14 @@ function App() {
             </section>
           </section>
           </>}
+          <div hidden={view !== 'builder'}><PcBuilder isActive={view === 'builder'} onAddProposal={addProposalToCart} /></div>
         </div>
       </main>
       <Footer />
       <OperatorBarSpacer />
       <ToolbarPanel active={panel} close={() => setPanel('')} session={session} refreshSession={refreshSession} />
       <ChatWidget open={chatOpen} setOpen={setChatOpen} setPanel={setPanel} panel={panel} />
+      {cartOpen ? <CartDrawer items={cart} onChangeQuantity={changeCartQuantity} onRemove={removeCartItem} onClose={() => setCartOpen(false)} /> : null}
       {notice ? <div className="shop-toast" role="status"><Check size={15} />{notice}<button onClick={() => setNotice('')} aria-label="Dispensar"><X size={13} /></button></div> : null}
     </div>
   );
