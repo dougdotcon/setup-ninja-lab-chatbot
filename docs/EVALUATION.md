@@ -38,5 +38,10 @@ O início do trabalho foi informado como **02/10/2026 às 18:25 em `America/Sao_
 | `f1c077d` | builder e validação determinística |
 | `43f425c` | fluxo conversacional e tela de montagem |
 | `24c2af9` | documentação arquitetura/provedores |
+| `887ded1` | documentação detalhada de catálogo, compatibilidade, provedores e avaliação |
+| `2b6bcd4` | ajuste do ranking gamer para evitar plataformas DDR3 e usar melhor o teto |
+| `cb02eab` | registro da avaliação de R$ 5.000 |
+| `6732bf6` | capacidade de armazenamento gamer e BIOS explicitamente desconhecida |
+| `docs: complete commit chronology` | atualização deste próprio histórico |
 
-O histórico local/tag `demo-v1` mantém a etapa demonstrativa anterior, mas seus produtos não fazem parte do catálogo ativo do montador. Push ao GitHub depende de autenticação/gravação no remoto e não é inferido a partir do histórico local.
+O histórico local/tag `demo-v1` mantém a etapa demonstrativa anterior, mas seus produtos não fazem parte do catálogo ativo do montador. Os commits documentais mais recentes podem ser identificados pelo assunto exato em `git log`. Push ao GitHub depende de autenticação/gravação no remoto e não é inferido a partir do histórico local.
