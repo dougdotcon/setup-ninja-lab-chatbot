@@ -12,7 +12,8 @@
     "start": "node server/index.js",
     "db:seed": "node server/index.js --seed-only",
     "lint": "eslint .",
-    "test": "node --test --test-concurrency=1 tests/*.test.js"
+    "test": "node --test --test-concurrency=1 tests/*.test.js",
+    "test:llm": "node scripts/verify-local-provider.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",
