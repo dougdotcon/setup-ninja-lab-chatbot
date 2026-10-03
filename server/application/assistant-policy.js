@@ -1,3 +1,5 @@
+import { compatibilityRuleLabel, compatibilityStatusLabel } from '../../shared/compatibility-labels.js';
+
 const normalizeText = (value) => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 export const CHAT_MODES = Object.freeze(['listing', 'comparison', 'hardware-guide', 'clarification']);
@@ -119,8 +121,8 @@ export function renderBuildExplanation(candidate, budgetCents, reasons, referenc
   const validatedReasons = reasons.filter((reason) => Object.hasOwn(reasonCopy, reason));
   const explanation = `NinjaRUDEUS montou uma sugestão com itens do catálogo oficial.\n\n${parts.join('\n')}\n\nTotal do catálogo: ${money(candidate.totalPriceCents)} (limite ${money(budgetCents)}).`
     + (validatedReasons.length ? `\n\n${validatedReasons.map((reason) => reasonCopy[reason]).join(' ')}` : '')
-    + (candidate.unknownRules.length ? `\n\nConfira antes da compra: ${candidate.unknownRules.join(', ')}. Dados não publicados não são confirmação de encaixe.` : '')
-    + `\n\nCompatibilidade: ${candidate.compatibility.status}.`;
+    + (candidate.unknownRules.length ? `\n\nConfira antes da compra: ${candidate.unknownRules.map(compatibilityRuleLabel).join(', ')}. Dados não publicados não são confirmação de encaixe.` : '')
+    + `\n\nCompatibilidade: ${compatibilityStatusLabel(candidate.compatibility.status)}.`;
   return referenceBudget ? `Você não informou um teto. Usei ${money(budgetCents)} apenas como referência inicial; posso ajustar ao orçamento que preferir.\n\n${explanation}` : explanation;
 }
 

@@ -1142,3 +1142,25 @@ html, body, .application-shell { background: var(--ground); color: var(--ink); }
 @media (max-width: 570px) {
   .builder-add-cart { min-height: 46px; }
 }
+
+/* Keep the builder's grid and its long catalog values inside narrow viewports. */
+.builder-layout { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); }
+.builder-layout > *, .builder-form, .builder-result { min-width: 0; }
+.builder-form, .builder-result { box-sizing: border-box; width: 100%; }
+.builder-form input:not([type=checkbox]), .builder-form select, .builder-form textarea { box-sizing: border-box; min-width: 0; max-width: 100%; }
+.builder-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.builder-parts article { min-width: 0; }
+.builder-parts article > div { min-width: 0; overflow-wrap: anywhere; }
+.builder-parts article > b { max-width: 100%; overflow-wrap: anywhere; }
+.builder-explanation { margin: 14px 0; border-block: 1px solid #333; color: #bbb; }
+.builder-explanation summary { padding: 11px 0; color: #ffad77; cursor: pointer; font-size: 11px; font-weight: 700; }
+.builder-explanation summary:focus-visible { outline: 2px solid #ff7300; outline-offset: 3px; }
+.builder-explanation .builder-copy { margin: 0 0 13px; }
+.builder-unknown ul { display: grid; gap: 4px; margin: 7px 0; padding-left: 18px; }
+.builder-unknown li { font-size: 10px; line-height: 1.45; overflow-wrap: anywhere; }
+@media (max-width: 850px) {
+  .builder-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .builder-fields { grid-template-columns: minmax(0, 1fr); }
+}

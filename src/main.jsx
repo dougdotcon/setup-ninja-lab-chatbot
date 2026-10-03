@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import './styles.css';
 import { interpretRequest, isPcBuildIntent } from '../shared/request.js';
+import { compatibilityRuleLabel, compatibilityStatusLabel } from '../shared/compatibility-labels.js';
 
 const CATEGORIES = [
   { label: 'Todos os produtos', slug: 'todos', Icon: House },
@@ -961,9 +962,9 @@ function PcBuilder({ isActive, onAddProposal }) {
             <button type="button" className="builder-reset" onClick={() => { setResult(null); setRequest('PC para uso geral'); setDedicatedGpu(false); setGpuId(''); setPendingParts({}); setDraftChanged(false); setError(''); }}>Nova montagem</button>
             <div className="builder-result-head"><div className="builder-result-label"><span className="builder-status-dot" /><span>PROPOSTA VALIDADA NO CATÁLOGO</span></div>
               <strong>{money.format(selected.totalPriceCents / 100)}</strong><small>de até {money.format(validatedBudget)} · {Math.max(0, validatedBudget - selected.totalPriceCents / 100) > 0 ? `${money.format(validatedBudget - selected.totalPriceCents / 100)} livres` : 'orçamento utilizado'}</small>
-              <span className={'compat-badge status-' + selected.compatibility.status.toLowerCase()}><ShieldCheck size={14} /> Compatibilidade {selected.compatibility.status}</span></div>
+              <span className={'compat-badge status-' + selected.compatibility.status.toLowerCase()}><ShieldCheck size={14} /> {compatibilityStatusLabel(selected.compatibility.status)}</span></div>
             <div className="builder-progress" aria-label={`${budgetUsage}% do orçamento usado`}><span><b>{completion}</b> SKUs na proposta <small>{budgetUsage}% do orçamento usado</small></span><div><i style={{ width: `${budgetUsage}%` }} /></div></div>
-            <p className="builder-copy">{selected.explanation}</p>
+            <details className="builder-explanation"><summary>Por que esta configuração?</summary><p className="builder-copy">{selected.explanation}</p></details>
             <div className="builder-parts">{selected.items.map((part) => <article key={part.id}>
               {partById(pickedByCategory[part.category], part.id)?.image_url ? <img className="builder-part-image" src={partById(pickedByCategory[part.category], part.id).image_url} alt="" loading="lazy" /> : <span className="builder-part-placeholder"><Cpu size={17} /></span>}
               <div><span>{part.category}{part.quantity > 1 ? ` · ${part.quantity} unidades` : ''}</span><strong>{part.name}</strong>
@@ -971,9 +972,9 @@ function PcBuilder({ isActive, onAddProposal }) {
               <b>{money.format(part.totalPriceCents / 100)}</b>
               {pickedByCategory[part.category] && choicesFor(pickedByCategory[part.category]).length ? <label className="builder-swap">Trocar<select aria-label={`Trocar ${part.category}`} value={pendingParts[pickedByCategory[part.category]] || part.id} onChange={(event) => { setPendingParts((current) => ({ ...current, [pickedByCategory[part.category]]: event.target.value })); setDraftChanged(true); }}><option value={part.id}>Manter selecionado</option>{choicesFor(pickedByCategory[part.category]).filter((item) => String(item.id) !== String(part.id)).map((item) => <option key={item.id} value={item.id}>{item.name} · {compactMoney(item.price_brl)}</option>)}</select></label> : null}
             </article>)}</div>
-            {selected.unknownRules.length ? <div className="builder-unknown"><strong>Itens que precisam de conferência</strong><p>{selected.unknownRules.join(' · ')}. Compatibilidade sem dados suficientes continua desconhecida; consulte as especificações antes de comprar.</p></div> : null}
+            {selected.unknownRules.length ? <div className="builder-unknown"><strong>Pontos pendentes de conferência</strong><ul>{selected.unknownRules.map((ruleId) => <li key={ruleId}>{compatibilityRuleLabel(ruleId)}</li>)}</ul><p>Os dados publicados não permitem confirmar estes itens. Consulte as especificações antes de comprar.</p></div> : null}
             {result.refinement?.changedParts?.length ? <p className="builder-change-note">Após validar as trocas, o montador ajustou {result.refinement.changedParts.join(', ')} para manter a proposta viável. Confira os SKUs acima.</p> : null}
-            <div className="builder-audit"><span>Seleção: {result.decision.provider === 'deterministic' ? 'regras do montador' : result.decision.provider} · {result.decision.model}</span><span>Fonte e estoque: catálogo oficial Monte seu PC · consultado agora</span></div>
+            <div className="builder-audit"><span>Seleção: {result.decision.provider === 'deterministic' ? 'regras do montador' : result.decision.provider} · {result.decision.model}</span><span>Fonte e estoque: snapshot oficial sincronizado do catálogo Monte seu PC</span></div>
             {result.candidates.length > 1 ? <details className="builder-alternatives"><summary>{result.candidates.length - 1} outras opções viáveis</summary>{result.candidates.slice(1).map((candidate) => <div key={candidate.id}><span>{candidate.items[0]?.name} · {candidate.items.find((item) => item.category === 'Placa de vídeo')?.name || 'vídeo integrado'}</span><b>{money.format(candidate.totalPriceCents / 100)}</b></div>)}</details> : null}
             <button type="button" className="builder-add-cart" onClick={() => onAddProposal(proposalCartItems)} disabled={!canAddProposal}><ShoppingBag size={16} />Adicionar SKUs à sacola demonstrativa</button>
             {draftChanged ? <small className="builder-cart-hint">Valide as alterações antes de adicionar esta proposta à sacola.</small> : null}
