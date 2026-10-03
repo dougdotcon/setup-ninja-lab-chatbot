@@ -19,7 +19,9 @@ test('chat model can choose only retrieved source IDs and a closed answer mode',
   const docs = [product, guide];
   const messages = createChatPlanMessages({ query: 'Como instalar memória?', documents: docs });
   assert.match(messages[0].content, /Não escreva a resposta ao cliente nem invente fatos/);
-  assert.match(messages[0].content, /\{"mode":"clarification","sourceIds":\[\],"guideId":null\}/);
+  assert.match(messages[0].content, /Selecione o guia técnico/);
+  assert.equal(JSON.parse(messages[1].content).task, 'select_hardware_guide');
+  assert.ok(JSON.parse(messages[1].content).availableSources.every((source) => source.kind === 'guide'));
   assert.doesNotMatch(messages[0].content, /"mode":"listing\|comparison/);
   const accepted = validateChatPlan(JSON.stringify({ mode: 'listing', sourceIds: ['17'], guideId: null }), docs);
   assert.ok(accepted);

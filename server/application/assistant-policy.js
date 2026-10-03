@@ -134,9 +134,15 @@ function asSource(document) {
 
 export function createChatPlanMessages({ query, context = '', documents = [] }) {
   const sources = documents.map(asSource);
+  const guides = sources.filter((source) => source.kind === 'guide');
+  const system = guides.length
+    ? 'Selecione o guia técnico cujo título responde à pergunta. Retorne JSON com mode="hardware-guide", sourceIds=[] e guideId igual ao ID do guia escolhido. Use mode="clarification" e guideId=null apenas se nenhum guia responder. Não escreva a resposta ao cliente nem invente fatos.'
+    : 'Selecione produtos relevantes de availableSources. Retorne JSON com mode="listing" (opções) ou "comparison" (comparação), sourceIds com até quatro IDs e guideId=null. Se nenhuma fonte responder, use mode="clarification" e sourceIds=[]. Não escreva a resposta ao cliente nem invente fatos.';
   return [
-    { role: 'system', content: 'Classifique a resposta. Retorne somente JSON válido com exatamente estas chaves, sem texto extra: {"mode":"clarification","sourceIds":[],"guideId":null}. mode deve ter um único valor exato: listing, comparison, hardware-guide ou clarification. Use somente IDs de availableSources. listing e comparison selecionam IDs kind=product. hardware-guide seleciona um guia que responda à pergunta; use o guideId desse guia e sourceIds vazio ou contendo apenas o ID do mesmo guia. Se faltar fonte adequada, use clarification com arrays vazio e guideId null. Não escreva a resposta ao cliente nem invente fatos.' },
-    { role: 'user', content: JSON.stringify({ task: 'classify_retrieved_answer', question: String(query).slice(0, 1200), conversationContext: String(context).slice(-1200), availableSources: sources }) },
+    { role: 'system', content: system },
+    { role: 'user', content: JSON.stringify({ task: guides.length ? 'select_hardware_guide' : 'select_catalog_sources',
+      question: String(query).slice(0, 1200), conversationContext: String(context).slice(-1200),
+      availableSources: guides.length ? guides : sources }) },
   ];
 }
 
