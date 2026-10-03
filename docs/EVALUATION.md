@@ -21,6 +21,7 @@
 | Refinamento “32 GB e NVIDIA” | Uma mensagem muda simultaneamente RAM e GPU sobre a montagem anterior; o resultado mantém o teto anterior e sinaliza as categorias alteradas. |
 | Modelo local simulado | Interpretação JSON e geração são chamadas de fato; ID alucinado na interpretação não entra na montagem; descrição com produto/preço inventado cai na resposta local. |
 | Chat RAG e isolamento | Pergunta fora do escopo não recupera fontes; tentativa de trocar instruções é bloqueada; pergunta de SSD recupera citações de SKUs em estoque; sessões distintas não veem históricos uma da outra. |
+| Trilha de respostas | O histórico RAG conserva a resposta entregue; montagens conservam solicitação, interpretação, seleção, modelo/fallback e explicação. O painel separa “busca FTS5” de “montagem validada”. |
 
 Esses valores são da captura de 02/10/2026 e podem divergir do catálogo atual. O teste não mede FPS, não confirma BIOS/forma física completa e não valida uma máquina montada.
 
@@ -53,5 +54,7 @@ O início do trabalho foi informado como **02/10/2026 às 18:25 em `America/Sao_
 | `4afcef4` | pedidos naturais, refinamento múltiplo, guarda do catálogo e verificação de saída do LLM |
 | `7600d70` | testes HTTP dos cenários do desafio, provedor local simulado e persistência SQLite |
 | `docs: document verified challenge flows and enable lint` | esta atualização de evidências, arquitetura e análise estática |
+| `b27f269` | trilha por sessão com saídas RAG e montagens, migração SQLite e auditoria na interface |
+| `docs: describe answer audit trail and current official source` | documentação da trilha de respostas e da origem ativa do catálogo |
 
 O histórico local/tag `demo-v1` mantém a etapa demonstrativa anterior, mas seus produtos não fazem parte do catálogo ativo do montador. Os commits documentais mais recentes podem ser identificados pelo assunto exato em `git log`. Push ao GitHub depende de autenticação/gravação no remoto e não é inferido a partir do histórico local.

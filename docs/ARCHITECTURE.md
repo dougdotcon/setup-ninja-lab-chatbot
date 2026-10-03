@@ -66,3 +66,5 @@ sequenceDiagram
 ## Estado e privacidade
 
 SQLite persiste catálogo e montagens, mas histórico e evidências são filtrados pela sessão assinada. Chaves de provedor ficam somente em memória, sem valor inicial ou chave de exemplo. `/api/inspect` expõe catálogo read-only; endpoints de histórico nunca enumeram sessões de terceiros. A sincronização busca uma origem fixa HTTPS, valida o payload completo e limita sua frequência.
+
+A trilha do operador combina dois registros da mesma sessão: `rag_runs` guarda pergunta, fontes, modo e resposta final; `pc_builds` guarda a solicitação, os SKUs oficiais, decisão, interpretação, geração e explicação final. O painel rotula cada caminho separadamente, pois uma montagem determinística não usa a busca FTS5. Instalações SQLite anteriores recebem as novas colunas por migração aditiva; execuções antigas sem texto continuam legíveis.

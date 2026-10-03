@@ -28,7 +28,7 @@ Shoppers browse and compare gaming PCs, components, monitors, and peripherals. O
 
 ## Capabilities and Constraints
 
-The marketplace and assistant are demonstration-only. Product rows were sampled from publicly indexed Setup Ninja storefront and product pages; prices and inventory are only the values visible during collection and are not live stock guarantees. Retrieval uses SQLite FTS5 with accent-insensitive keyword ranking. Without an API key the assistant returns a clearly labeled deterministic answer grounded in local catalog data. API keys stay in server memory for one expiring browser session; they are never written to the database, browser storage, or logs.
+The marketplace and assistant are demonstration-only. The active SQLite catalog comes from the official Monte seu PC JSON API, is refreshed at startup, and retains a versioned fallback snapshot. Prices and stock reflect the last successful sync, not a live checkout guarantee. Retrieval uses SQLite FTS5 with accent-insensitive keyword ranking. Without an API key the assistant returns a clearly labeled deterministic answer grounded in local catalog data. API keys stay in server memory for one expiring browser session; they are never written to the database, browser storage, or logs. A session-scoped operator trail shows retrieved evidence, validated builds, provider choices and the final response.
 
 ## Brand Commitments
 
@@ -36,7 +36,7 @@ Preserve the Setup Ninja name, Portuguese marketplace labels, original commerce 
 
 ## Evidence on Hand
 
-Publicly indexed live storefront at https://www.setupninja.com.br/, including `/`, `/computadores`, `/perifericos`, `/hardware`, and product pages. The homepage and product pages expose genuine product copy, Pix prices, installment prices, department names, and Dooca CDN assets. Direct requests to the storefront origin returned HTTP 403, so the scrape uses accessible indexed pages; extraction gaps are documented in `data/scrape-report.json`.
+The visual reference is the public storefront at https://www.setupninja.com.br/. The active product source is the official API at https://monte-seu-pc.setupninja.com.br/produtos. The bundled capture has 1,236 unique IDs, including 749 available products and 487 unavailable products; see `docs/CATALOG.md` for normalization and source limits. Earlier indexed storefront samples remain as historical design research and are not used by the active builder.
 
 ## Product Principles
 
