@@ -1,60 +1,113 @@
-# Setup Ninja Studio
+# Setup Ninja Studio · NinjaRUDEUS
 
-Vitrine demonstrativa da Setup Ninja com NinjaRUDEUS, catálogo de componentes oficiais, SQLite/FTS5 e montador determinístico de PCs. O montador só recomenda SKUs disponíveis na captura oficial, soma os preços do catálogo e rejeita conflitos confirmados. Regras para as quais a fonte não traz dados suficientes aparecem como **UNKNOWN**; isso não garante encaixe físico nem desempenho.
+Demonstração de marketplace com montador de PCs, chatbot de hardware, catálogo oficial em SQLite e painéis para inspecionar dados e respostas. A LLM interpreta pedidos e seleciona planos de resposta; o servidor controla SKU, estoque, quantidades, preços, orçamento e compatibilidade.
 
-## Executar
+**Demonstração publicada:** [setupninja.douvras.com](https://setupninja.douvras.com) · **Código:** [dougdotcon/setup-ninja-lab-chatbot](https://github.com/dougdotcon/setup-ninja-lab-chatbot)
 
-Requisitos: Node.js 24+ (inclui `node:sqlite`).
+## Começar localmente com Docker
+
+Pré-requisitos: Git, Docker Engine ou Docker Desktop em execução e Docker Compose v2. Não é necessário instalar Node no host para rodar a aplicação dessa forma. Os comandos abaixo partem de um terminal na pasta do repositório.
 
 ```sh
+git clone https://github.com/dougdotcon/setup-ninja-lab-chatbot.git
+cd setup-ninja-lab-chatbot
+docker compose -f compose.yaml -f compose.local.yaml up -d --build
+docker compose -f compose.yaml -f compose.local.yaml ps
+curl --fail http://127.0.0.1:4174/api/health
+```
+
+Abra **http://127.0.0.1:4174**. O build instala dependências, compila a interface e inicia a API. Na primeira carga, o servidor prepara o SQLite com o snapshot oficial versionado e os guias técnicos. Depois tenta atualizar o catálogo pela API oficial; uma falha preserva a última versão íntegra.
+
+A aplicação começa **sem chave e sem LLM conectada**. Loja, montador, busca local e inspeção funcionam com a prévia determinística identificada. Para usar inferência, siga o [tutorial de Ollama ou LM Studio](docs/LOCAL_MODELS.md).
+
+```sh
+# Acompanhar a inicialização; Ctrl+C encerra apenas a leitura dos logs.
+docker compose -f compose.yaml -f compose.local.yaml logs -f web
+
+# Encerrar a aplicação mantendo o volume SQLite.
+docker compose -f compose.yaml -f compose.local.yaml down
+```
+
+O arquivo `compose.local.yaml` habilita cookies de sessão em HTTP local. Para o domínio HTTPS, usa-se apenas `compose.yaml`. Ambos publicam a porta somente no loopback do host e persistem o SQLite em volume Docker. Não use `down -v` se quiser conservar os dados. Veja [operação e backup](docs/OPERATIONS.md).
+
+## Desenvolver sem Docker
+
+Pré-requisitos: **Node.js 24 ou superior**, npm e Git. O projeto usa `node:sqlite`; não há serviço de banco separado.
+
+```sh
+git clone https://github.com/dougdotcon/setup-ninja-lab-chatbot.git
+cd setup-ninja-lab-chatbot
 npm ci
 npm run db:seed
 npm run dev
 ```
 
-No desenvolvimento, a interface Vite atende em `http://127.0.0.1:5173` e a API em `http://127.0.0.1:4174`. Para uma execução de produção local use `npm run build && npm start`. O SQLite fica em `data/setupninja.sqlite`; defina `SETUPNINJA_DATA_DIR` para armazená-lo fora do repositório. O serviço busca a fonte oficial ao iniciar e mantém o snapshot versionado como contingência validada. A sincronização pública tem limite global de uma solicitação por minuto e consulta apenas a URL oficial fixa.
+Abra **http://127.0.0.1:5173**. Vite atende a interface e encaminha `/api` à API Express em `127.0.0.1:4174`. `npm run db:seed` é idempotente e opcional: o backend também inicializa a base ao iniciar. O SQLite e a chave de assinatura de sessão ficam em `data/`, ignorados pelo Git.
 
-## Catálogo, compatibilidade e limites
-
-A origem é o configurador oficial [`monte-seu-pc.setupninja.com.br/produtos`](https://monte-seu-pc.setupninja.com.br/produtos). O snapshot versionado em `data/catalog-api.snapshot.json` contém 1.238 anúncios de categoria e 1.236 IDs únicos após deduplicação; 749 estão disponíveis e 487 sem estoque. A API pode mudar esses números entre atualizações. O catálogo conserva preço, estoque, categoria, atributos publicados, imagem CDN e link da fonte. Produtos sem estoque aparecem na consulta administrativa, mas nunca entram no RAG de recomendação nem no montador.
-
-`server/domain/compatibility.js` executa verificações puras para estoque/quantidade, socket CPU/placa-mãe, tipo e capacidade da memória, vídeo integrado, potência/PFC da fonte, TDP e compatibilidade do cooler e limites dimensionais que a API descreve. `server/domain/build.js` combina candidatos com limite de preço, memória, CPU/GPU preferidos e restrições de peças fixas durante refinamentos. A ordenação gamer é uma heurística por custo de componentes, sem benchmarks ou promessas de FPS. Com 15 mil reais, Ryzen 7 + RTX 5070 + 32 GB, a amostra atual escolhe uma montagem de R$ 11.044,61; não promete gastar o teto nem que essa seja a melhor configuração de desempenho.
-
-Na finalidade gamer, o ranking aplica uma heurística documentada de custo: tenta usar aproximadamente 80% do teto, favorece GPU com participação razoável no orçamento, exige ao menos seis núcleos quando há opção compatível e penaliza plataforma DDR3 antiga se existir alternativa. Isso não é benchmark nem medida de desempenho; opções baratas podem continuar sendo escolhidas em outros contextos. Em montagens gamer com teto ≥ R$ 4.000, prefere armazenamento de pelo menos 480 GB se couber no orçamento. O catálogo não declara todos os formatos de placa aceitos pelos gabinetes, interfaces/slots de armazenamento, versão de BIOS instalada/lista de CPUs suportadas por BIOS, conectores de fonte ou medições de desempenho. Esses casos ficam como `UNKNOWN` e aparecem no resultado para revisão. Produtos e preços mudam no site original; a demonstração não fecha pedidos nem processa pagamentos.
-
-## Chat e modelos
-
-Sem credenciais, as respostas usam RAG local sobre a base de tecnologia e o catálogo. A busca FTS5/BM25 recupera fontes e respeita filtros de orçamento antes do top-K. A política de escopo limita o NinjaRUDEUS a hardware, catálogo e suporte técnico. A LLM devolve contratos JSON estritos com enumerações e IDs limitados; o servidor compõe a persona e os fatos a partir de produtos ou guias oficiais de fabricantes, sem renderizar prosa arbitrária do modelo. Explicações de montagem aceitam até 3 motivos permitidos e planos RAG até 4 fontes recuperadas. Perguntas de montagem no próprio chat usam o mesmo montador e as mesmas validações do painel. IDs, preços, estoque e total são renderizados a partir dos registros do servidor, não da prosa do modelo.
-
-Em **API do modelo**, é possível configurar por sessão um endpoint OpenAI-compatible, OpenAI, Ollama ou LM Studio. Ollama e LM Studio podem usar os endereços locais permitidos no Compose abaixo. As credenciais ficam apenas na memória do processo e não são gravadas em SQLite nem em logs; depois de reiniciar, precisam ser informadas novamente. Nenhuma chave acompanha este repositório.
-
-Typesafe Jev é uma integração separada e opcional para escolha entre IDs de candidatos já validados. Jev recebe opções fechadas e não gera texto de resposta; sem Jev, o ranking determinístico escolhe a opção. O provedor de linguagem seleciona motivos permitidos para a explicação; o renderer usa os fatos canônicos, ou a prévia local quando não há modelo ou a resposta é inválida. Para verificar conectividade de Jev, configure sua credencial na interface; os testes usam validação isolada e não alegam uma chamada real.
-
-## Dados e segurança
-
-O SQLite guarda catálogo normalizado, categorias, especificações, chunks/índice FTS, execuções de sincronização e sessões. Consultas de histórico e execuções são escopadas pelo cookie assinado. O inspetor público libera somente tabelas de catálogo em modo somente leitura. A configuração de modelo e os builds ficam separados por sessão e expiram; chaves nunca entram na base.
-
-Chamadas externas de modelos exigem HTTPS e endereço público. O timeout padrão é de 60 s para runtimes locais e 25 s para provedores remotos; `SETUPNINJA_LLM_TIMEOUT_MS` permite configurar de 5 a 120 s. Redirecionamentos e endereços privados são recusados, exceto os endpoints locais configurados explicitamente em `SETUPNINJA_LOCAL_LLM_URLS` para Ollama/LM Studio. O servidor não encaminha chaves nem envia mensagens a serviços externos sem configuração do usuário.
-
-## Docker e publicação
+Para testar a interface compilada em um único servidor, em bash/zsh:
 
 ```sh
-docker compose up --build -d
-docker compose ps
-docker compose logs -f web
+npm run build
+NODE_ENV=production COOKIE_SECURE=false npm start
 ```
 
-O Compose expõe somente `127.0.0.1:4174`, executa como usuário não-root, usa volume persistente para SQLite e reinicia após falha/reboot. Nginx encaminha `https://setupninja.douvras.com` para a porta local. Para usar um modelo Ollama/LM Studio instalado no host Docker, configure-o para ouvir na interface acessível pelo contêiner e permita sua porta no firewall; os endereços preconfigurados são `host.docker.internal:11434` e `:1234`. A máquina de um visitante não é o host do servidor.
+Abra **http://127.0.0.1:4174**. No PowerShell, defina as variáveis antes de executar: `$env:NODE_ENV='production'; $env:COOKIE_SECURE='false'; npm start`. O modo de produção é necessário para Express servir `dist/`; `npm start` sozinho não serve a interface compilada.
 
-Para backup consistente, pare o contêiner durante a cópia do volume:
+O [guia de execução local](docs/LOCAL_DEVELOPMENT.md) detalha pré-requisitos, variáveis, portas, persistência e solução de problemas. O projeto não carrega `.env` automaticamente.
 
-```sh
-docker compose stop web
-docker run --rm -v setupninja_setupninja_data:/data:ro -v "$PWD":/backup alpine tar czf /backup/setupninja-data.tgz -C /data .
-docker compose start web
+## Experimentar o demonstrativo
+
+1. Abra **Monte seu PC**, informe objetivo e orçamento e gere uma proposta. Confira peças, total e pendências de compatibilidade.
+2. Troque um componente pelo seletor e use **Validar trocas e atualizar**. A sacola só recebe a proposta após nova validação.
+3. No chat, peça “Monte um PC gamer de até R$ 6.000 com Ryzen e 32 GB de RAM” e depois “Pode trocar a placa de vídeo por uma NVIDIA?”.
+4. Pergunte “Como instalar memória RAM no PC com segurança?” e confira a fonte técnica citada.
+5. Use **Banco SQLite**, **API do modelo** e **Execuções RAG** para inspecionar catálogo, conexão e resposta entregue.
+
+Percursos guiados, requisições HTTP e resultados esperados estão nos [tutoriais de uso e API](docs/TUTORIALS.md).
+
+## Como funciona
+
+```mermaid
+flowchart LR
+  U[Loja, montador e chat React] --> API[API Express]
+  Official[API oficial de produtos] --> Normalize[Normalização e transação]
+  Normalize --> DB[(SQLite e FTS5)]
+  API --> DB
+  API --> Domain[Regras: estoque, orçamento e compatibilidade]
+  API --> Model[LLM opcional: intenção e plano JSON]
+  Model --> Validate[Validar contrato e IDs]
+  Domain --> Render[Resposta NinjaRUDEUS com fatos canônicos]
+  Validate --> Render
+  Render --> U
 ```
 
-## Verificação
+A fonte comercial é a [API oficial do Monte seu PC](https://monte-seu-pc.setupninja.com.br/produtos). O snapshot versionado possui 1.236 produtos únicos em 17 categorias; as contagens de estoque e os preços variam nas sincronizações. Produtos indisponíveis não entram nas recomendações. Guias técnicos possuem fontes de fabricantes e sobrevivem às atualizações comerciais.
+
+A recuperação é **RAG lexical com SQLite FTS5/BM25**, sem embeddings ou banco vetorial. O montador usa regras determinísticas e um ranking heurístico por finalidade, plataforma e distribuição do orçamento. Não estima FPS nem busca uma solução matematicamente ótima.
+
+Conflitos confirmados (`FAIL`) eliminam uma montagem. Dados insuficientes ficam como `UNKNOWN`, apresentados como **Pendente de conferência**. Uma proposta sem conflito conhecido não é garantia de encaixe físico, BIOS ou desempenho. O carrinho demonstra quantidades e subtotal; não reserva estoque nem processa pedidos ou pagamentos.
+
+O backend suporta OpenAI, endpoints OpenAI-compatible, Ollama e LM Studio. Typesafe Jev é opcional e separado: escolhe entre candidatos já validados. Credenciais de provedores ficam na memória da sessão e precisam ser configuradas novamente após reinício. O modelo não tem acesso para alterar preços, estoque ou regras.
+
+## Documentação
+
+| Quero… | Documento |
+|---|---|
+| Instalar, rodar e resolver problemas locais | [Execução local](docs/LOCAL_DEVELOPMENT.md) |
+| Conectar Ollama ou LM Studio, com ou sem Docker | [Modelos locais](docs/LOCAL_MODELS.md) |
+| Experimentar montagem, chat, refinamento e API | [Tutoriais](docs/TUTORIALS.md) |
+| Entender módulos, SOLID e fluxos | [Arquitetura e diagramas](docs/ARCHITECTURE.md) |
+| Entender por que cada técnica foi escolhida | [Decisões arquiteturais e alternativas](docs/DECISIONS.md) |
+| Entender origem, atualização e tabelas | [Catálogo](docs/CATALOG.md) |
+| Conhecer as regras e os dados faltantes | [Compatibilidade](docs/COMPATIBILITY.md) |
+| Configurar outros provedores e Jev | [Provedores](docs/PROVIDERS.md) |
+| Operar, atualizar, fazer backup e restaurar | [Operação](docs/OPERATIONS.md) |
+| Conferir o desafio e suas evidências | [Aceitação](docs/ACCEPTANCE.md) e [avaliação](docs/EVALUATION.md) |
+| Conhecer a referência visual e os fluxos testados | [UX](docs/UX.md) e [identidade](DESIGN.md) |
+
+## Verificar alterações
+
+Com Node.js 24+ e dependências instaladas:
 
 ```sh
 npm test
@@ -62,14 +115,6 @@ npm run lint
 npm run build
 ```
 
-Os testes cobrem normalização do snapshot, deduplicação, conflitos e incertezas, estoque por quantidade, regras de RAM/fonte/cooler, teto de preço, filtros de componentes, seleção Jev de candidatos fechados e os pedidos literais do desafio por HTTP. Um endpoint local simulado verifica as duas chamadas do protocolo de linguagem e o fallback diante de informação inventada. A verificação final aprovou 28 testes automatizados e nove cenários com Ollama real; veja o [relatório](docs/verification/ollama-acceptance.json). A cobertura não substitui ensaio elétrico, medição de desempenho ou validação física.
+`npm test` testa domínio e percursos HTTP com provedores simulados, sem chaves. `npm run test:llm` é um teste separado, opt-in, que exige runtime e modelo reais disponíveis; siga [modelos locais](docs/LOCAL_MODELS.md). A avaliação registrada em 03/10/2026 aprovou **28 testes automatizados e nove cenários com Ollama real**; consulte o [relatório](docs/verification/ollama-acceptance.json) para distinguir inferência, mocks e limitações.
 
-Documentação adicional: [fluxos e arquitetura](docs/ARCHITECTURE.md), [fonte e sincronização do catálogo](docs/CATALOG.md), [matriz de compatibilidade](docs/COMPATIBILITY.md), [configuração de provedores](docs/PROVIDERS.md) e [cenários/limites da avaliação](docs/EVALUATION.md).
-
-> O trabalho começou em 02/10/2026 às 18:25 no fuso `America/Sao_Paulo`, conforme registro do projeto.
-
-## Aceitação e experiência
-
-Veja a [matriz completa do desafio](docs/ACCEPTANCE.md), os [diagramas SOLID e RAG](docs/ARCHITECTURE.md), a [configuração Ollama/LM Studio e teste real](docs/PROVIDERS.md), as [evidências de execução](docs/EVALUATION.md) e a [auditoria da experiência de montagem](docs/UX.md). `npm run test:llm` é opt-in: requer runtime realmente disponível e não inclui chave.
-
-A identidade visual usa os assets originais da Setup Ninja e sua paleta escura. O carrinho demonstrativo fica separado do chatbot e permite revisar quantidades e totais; não processa compra. O montador envia as peças escolhidas à validação do servidor.
+O trabalho começou em 02/10/2026 às 18:25 em `America/Sao_Paulo`. O histórico publicado está atribuído a dougdotcon, com commits separados por etapa.

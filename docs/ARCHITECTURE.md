@@ -1,5 +1,7 @@
 # Arquitetura do montador e do atendimento
 
+As justificativas, alternativas, consequências e critérios de evolução estão em [DECISIONS.md](DECISIONS.md). Os diagramas abaixo descrevem a implementação atual; os [tutoriais locais](LOCAL_DEVELOPMENT.md) mostram como executá-la.
+
 ## Responsabilidades e SOLID
 
 ```mermaid

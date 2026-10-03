@@ -1,5 +1,7 @@
 # Provedores e teste de modelo local
 
+Para instalar e conectar os runtimes passo a passo, comece pelo [tutorial de modelos locais](LOCAL_MODELS.md). Para preparar Docker ou Node, veja [execução local](LOCAL_DEVELOPMENT.md).
+
 ## Conexão por sessão
 
 O backend usa `POST {baseUrl}/chat/completions`. OpenAI, Ollama e LM Studio recebem JSON Schema estrito quando o contrato é estruturado; outros endpoints OpenAI-compatible recebem modo JSON e todos os resultados passam por validação exata no servidor. A barra superior permite conectar OpenAI, endpoint OpenAI-compatible, Ollama ou LM Studio. Preencha o ID de um modelo realmente instalado/disponível. Nenhuma chave ou modelo fica conectado por padrão.
@@ -19,7 +21,7 @@ O proxy HTTPS publicado e `deploy/setupninja.nginx` permitem 300 s de leitura, c
 
 `localhost` no servidor da aplicação é diferente do `localhost` do visitante. No Compose, `host.docker.internal` aponta para o host onde Docker roda. O Ollama/LM Studio deve ouvir na interface que o contêiner consegue alcançar; mantenha a porta restrita ao host/rede privada da aplicação.
 
-Para executar **todo o projeto na própria máquina**, rode `docker compose up --build -d` e configure a base do runtime local na interface. Em Linux, o Compose já declara `host.docker.internal:host-gateway`. Para um modelo na máquina do visitante enquanto a aplicação roda na Douvras, é necessário um túnel/proxy privado que exponha o runtime ao host Docker ou um endpoint HTTPS autenticado controlado por você. A aplicação hospedada não alcança automaticamente o notebook pelo endereço digitado `localhost`.
+Para executar **todo o projeto na própria máquina**, rode `docker compose -f compose.yaml -f compose.local.yaml up --build -d` e configure a base do runtime local na interface. Em Linux, o Compose já declara `host.docker.internal:host-gateway`. Para um modelo na máquina do visitante enquanto a aplicação roda na Douvras, é necessário um túnel/proxy privado que exponha o runtime ao host Docker ou um endpoint HTTPS autenticado controlado por você. A aplicação hospedada não alcança automaticamente o notebook pelo endereço digitado `localhost`.
 
 ## Contratos, persona e fallback
 
