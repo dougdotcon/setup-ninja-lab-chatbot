@@ -1,20 +1,19 @@
-# Design system
+# Sistema de design
 
-## Brand and palette
+## Marca e paleta
 
-The storefront uses the original white Setup Ninja logo from the official Dooca CDN. The desktop and mobile variants are stored in `public/assets/setupninja-logo-white.webp` and `public/assets/setupninja-logo-white-mobile.webp`; their original URLs and capture date are recorded in `docs/UX.md`.
+A vitrine usa a logo branca original da Setup Ninja, servida pelo CDN oficial. As variantes para desktop e dispositivos móveis estão copiadas em `public/assets/setupninja-logo-white.webp` e `public/assets/setupninja-logo-white-mobile.webp`; URLs originais e data da captura estão registradas em `docs/UX.md`.
 
-The interface follows the live storefront palette: near-black `#0e0e0e`, charcoal `#111315` and `#1a1d21`, dark gray `#222222`, white `#ffffff` and `#f0f0f0`, secondary gray `#888888` and `#aaaaaa`, and Setup Ninja orange `#ff7300` with `#fd7710` for nearby accents. Orange marks actions and selected states. Dark neutrals carry the page, cards, and controls.
+A interface segue a paleta observada na loja: quase preto `#0e0e0e`, carvão `#111315` e `#1a1d21`, cinza escuro `#222222`, branco `#ffffff` e `#f0f0f0`, cinzas secundários `#888888` e `#aaaaaa`, além do laranja Setup Ninja `#ff7300` e do tom próximo `#fd7710`. O laranja destaca ações e seleções. Tons escuros formam o fundo, os cartões e os controles.
 
-## Typography
+## Tipografia
 
-Use Syne for display headings, Open Sans for interface copy, and Inter for compact data. Keep product names and Portuguese labels readable at desktop and mobile sizes.
+Use Syne em títulos de destaque, Open Sans nos textos da interface e Inter em dados compactos. Mantenha nomes de produtos e rótulos em português legíveis em telas grandes e pequenas.
 
-## Components and behavior
+## Componentes e comportamento
 
-- The storefront header, departments, catalog, cart, builder, assistant, and operator panels share the dark palette.
-- Use the CDN-provided logo files through the local copies; do not recreate the mark with SVG or text.
-- The cart stores only catalog item IDs and display fields in local storage. It is a demonstrator with no order or payment action.
-- The PC builder sends selected official catalog IDs to `/api/build`; the backend remains the authority for SKU availability, budget, and compatibility. Keep `UNKNOWN` visible as unknown.
-- Orange action controls need a clear hover, focus, disabled, loading, and error state against the dark background.
-
+- Cabeçalho, departamentos, catálogo, carrinho, montador, assistente e painéis administrativos compartilham a paleta escura.
+- Use as cópias locais dos arquivos de logo obtidos pelo CDN; não redesenhe a marca com SVG ou texto.
+- O carrinho armazena no local storage apenas IDs de catálogo e campos de apresentação. É uma demonstração sem ação de pedido ou pagamento.
+- O montador envia IDs oficiais de catálogo para `/api/build`; o backend valida disponibilidade, orçamento e compatibilidade. Mantenha `UNKNOWN` visível como informação não confirmada.
+- Controles de ação laranja precisam de estados claros de foco, hover, desabilitado, carregamento e erro sobre o fundo escuro.

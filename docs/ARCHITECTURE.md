@@ -1,70 +1,105 @@
 # Arquitetura do montador e do atendimento
 
-## Componentes
+## Responsabilidades e SOLID
 
 ```mermaid
 flowchart LR
-  Browser[Loja, chat e inspetores] --> Routes[Express API]
-  Routes --> Sessions[Cookie assinado e escopo por sessão]
-  Routes --> CatalogService[Sincronização oficial]
-  Routes --> BuildDomain[Combinação e compatibilidade]
-  Routes --> Retrieval[RAG FTS5 BM25]
-  CatalogService --> Source[API oficial Setup Ninja]
-  CatalogService --> SQLite[(SQLite)]
-  BuildDomain --> SQLite
-  Retrieval --> SQLite
-  Routes -. opcional .-> Jev[Typesafe Jev: escolhe ID fechado]
-  Routes -. opcional .-> TextModel[OpenAI-compatible / Ollama / LM Studio]
+  UI[React: loja, montagem, carrinho e painéis] --> API[Express: HTTP e sessão]
+  API --> Policy[Application: contratos e renderização canônica]
+  API --> Build[Domain: candidatos e compatibilidade]
+  API --> DB[Repository: SQLite e FTS5]
+  API --> Ports[Infrastructure: clientes injetáveis]
+  Ports --> Official[API oficial Setup Ninja]
+  Ports --> Models[OpenAI-compatible / Ollama / LM Studio]
+  Ports --> Jev[Typesafe Jev: ID fechado]
+  DB --> SQLite[(SQLite persistente)]
+  Build --> Facts[SKUs, estoque, centavos e regras]
+  Policy --> Facts
 ```
 
-O projeto separa interpretação explícita da frase (`shared/request.js`), normalização de catálogo (`server/domain/catalog.js`), regras de compatibilidade (`server/domain/compatibility.js`), geração/validação de montagens (`server/domain/build.js`), persistência SQLite (`server/database.js`) e rotas/transporte HTTP (`server/index.js`). As regras de domínio recebem objetos e não fazem chamadas de rede. O browser nunca decide compatibilidade, total ou estoque. As rotas dependem das funções de domínio e de interfaces de dados do módulo SQLite; um novo provedor de texto não exige alterar a compatibilidade.
+| Módulo | Responsabilidade |
+|---|---|
+| `shared/request.js` | Interpretar restrições explícitas e reconhecer pedidos de montagem no servidor e no browser. |
+| `server/domain/catalog.js` | Normalizar a API oficial e deduplicar produtos. |
+| `server/domain/compatibility.js` | Regras puras com `PASS`, `FAIL` e `UNKNOWN`. |
+| `server/domain/build.js` | Gerar e pontuar candidatos, quantidades e orçamento. |
+| `server/domain/hardware-guides.js` | Conhecimento editorial de hardware com fontes de fabricantes. |
+| `server/application/assistant-policy.js` | Validar contratos da LLM, escopo, persona e compor respostas a partir de fatos autorizados. |
+| `server/infrastructure/model-client.js` | Transporte OpenAI-compatible, timeout, validação de origem e parsing de resposta. |
+| `server/infrastructure/official-catalog-client.js` | Consumir exclusivamente a origem oficial do catálogo. |
+| `server/infrastructure/typesafe-jev.js` | Adaptar o protocolo Jev de decisão, com `fetchImpl` e timeout injetáveis. |
+| `server/database.js` | Persistência, migrações, sessão, consulta SQL e índice FTS5. |
+| `server/index.js` | Composição dos módulos e orquestração das rotas HTTP. |
 
-## Fluxo de montagem
+SRP separa transporte, persistência, interpretação, política e regras. OCP permite adicionar um endpoint compatível sem mudar compatibilidade. Os adaptadores respeitam contratos limitados de interpretação, escolha e resposta; uma implementação substituta precisa produzir o mesmo contrato validado (LSP). Cada consumidor usa sua operação específica, sem receber um cliente universal para alterar preços (ISP). Domínio e policy não dependem de Express nem fazem rede; os clientes aceitam dependências de transporte para substituição nos testes (DIP). O entrypoint concentra a composição e a orquestração; não há um contêiner de injeção obrigatório.
+
+## Fluxo da montagem
 
 ```mermaid
 sequenceDiagram
   actor U as Pessoa
-  participant API as API da aplicação
-  participant L as Modelo de linguagem (opcional)
+  participant A as Aplicação
+  participant L as LLM
   participant D as Domínio determinístico
-  participant J as Jev (opcional)
-  participant DB as SQLite oficial
-  U->>API: pedido natural + teto + sessão
-  opt interpretação estruturada conectada
-    API->>L: extrair intenção e preferências
-    L-->>API: JSON limitado por schema
+  participant J as Jev opcional
+  participant DB as SQLite
+  U->>A: pedido, orçamento, preferências e build anterior
+  A->>DB: estado da própria sessão e catálogo
+  opt modelo conectado
+    A->>L: intenção em JSON estrito
+    L-->>A: propósito, RAM e preferências ou null
+    A->>A: validar schema e preservar restrições explícitas
   end
-  API->>D: requisitos + IDs fixos da montagem anterior
-  D->>DB: produtos oficiais disponíveis
-  D->>D: combinar, somar, aplicar regras e orçamento
-  D-->>API: 1–5 candidatos verificados
-  opt decisão Jev configurada
-    API->>J: escolha entre IDs fechados, sem alterar teto
-    J-->>API: ID e confiança
+  A->>D: requisitos e IDs obrigatórios
+  D->>D: estoque, quantidades, orçamento, balanceamento e regras
+  D-->>A: até 4 candidatos sem FAIL conhecido
+  opt Jev conectado
+    A->>J: escolher entre IDs apresentados
+    J-->>A: ID e confiança
   end
-  API->>D: revalidar candidato escolhido
-  opt provedor textual configurado
-    API->>L: explicar apenas configuração validada
-    L-->>API: texto sujeito a validação
+  A->>D: revalidar escolha, teto e compatibilidade
+  opt modelo conectado
+    A->>L: selecionar reason IDs permitidos
+    L-->>A: plano JSON fechado
+    A->>A: compor explicação com os fatos do candidato
   end
-  API->>DB: persistir itens, preço e evidências da sessão
-  API-->>U: SKUs, estoque, preço, total e incertezas
+  A->>DB: salvar pedido, seleção, evidências e telemetria
+  A-->>U: peças, total, fontes e incertezas
 ```
 
-## Contratos e limites
+A LLM não devolve SKUs, preços ou compatibilidade que sejam usados como verdade. Na interpretação, campos ausentes são `null`; campos extras ou valores inválidos acionam fallback. Restrições explícitas e memória do pedido anterior prevalecem sobre sugestões da LLM. `requiredParts` registra IDs que precisam ser mantidos no refinamento; `refineTargets` registra categorias que a pessoa pediu para trocar, permitindo preservar os demais IDs e identificar dependências que precisem mudar. Restrições manuais explícitas não são relaxadas silenciosamente. Na explicação, o modelo escolhe até três motivos enumerados que já se aplicam ao candidato. No RAG, o modelo pode selecionar até quatro IDs entre as fontes recuperadas. Os schemas são estritos para OpenAI, Ollama e LM Studio; outros endpoints OpenAI-compatible recebem modo JSON e ainda passam pela validação exata no servidor. O servidor renderiza os nomes, quantidades, preços, total e avisos. Prosa arbitrária, promessa de FPS ou saída fora da persona não é renderizada como resposta.
 
-- `priceCents` e estoque vêm do catálogo oficial; IDs selecionados pertencem à lista em estoque. Quantidades são verificadas por SKU e por módulos de RAM.
-- Compatibilidade retorna `PASS`, `FAIL` ou `UNKNOWN`. Falhas confirmadas removem uma opção; ausência de informação permanece visível e não vira aprovação.
-- Preferências e orçamento são restrições do servidor. Propostas de Jev só aceitam IDs apresentados e passam pelas regras novamente. Jev seleciona, não gera resposta textual.
-- O modelo de linguagem pode interpretar e explicar, mas não fornece os valores finais. A interface renderiza preços/IDs/estoque da resposta canônica do backend.
-- Um refinamento referencia um build anterior da mesma sessão e tenta preservar os IDs das demais peças. Dependências que precisem mudar são reportadas.
-- Sem teto declarado, a aplicação usa e divulga uma referência inicial de R$ 8.000 (R$ 15.000 para RTX/RX 5070–5090); a pessoa pode ajustar o orçamento. Uma impossibilidade sob teto informado produz recusa explícita.
-- A classificação/score gamer é uma regra aproximada baseada em custo, sem benchmarks. Não há garantia de FPS, estabilidade elétrica ou montagem física.
-- Sem chave/API conectada, o modo local responde deterministicamente; a interface o identifica como prévia.
-- A resposta do LLM no chat passa por verificação de preços e modelos contra os trechos recuperados; uma saída não fundamentada usa o texto local. A checagem reduz alucinações evidentes, sem ser uma prova formal sobre texto livre.
+## RAG e instruções de hardware
+
+```mermaid
+flowchart LR
+  Q[Pergunta e contexto limitado da sessão] --> Scope[Escopo e proteção de instruções]
+  Scope --> SQL[Filtros SQL: categoria, estoque e teto]
+  SQL --> FTS[FTS5: BM25 e limite de contexto]
+  FTS --> Plan[LLM: listing / comparison / hardware-guide / clarification]
+  Plan --> Validate[Schema exato e IDs recuperados]
+  Validate --> Render[Resposta canônica NinjaRUDEUS]
+  Validate -->|saída inválida| Fallback[Resposta local identificada]
+  Render --> Evidence[Fontes e trilha da sessão]
+  Fallback --> Evidence
+```
+
+Produtos são recuperados do SQLite atualizado pela API oficial. Guias são resumos versionados de documentação primária de Kingston, AMD e Microsoft. Têm fontes próprias e não fingem ser SKUs. O seed dos guias é independente da sincronização comercial: atualizar o catálogo não apaga instruções de hardware. O plano da LLM usa apenas IDs recuperados; fatos comerciais e instruções vêm dos documentos autorizados. Comparação apresenta especificações publicadas e não inventa benchmarks.
+
+Os filtros de categoria/orçamento/estoque são aplicados no SQL antes do limite de recuperação, evitando excluir uma opção barata porque itens caros ocuparam os primeiros resultados. FTS5 evita enviar todo o catálogo ao modelo. Para catálogos maiores, o próximo passo é medir recall, acrescentar filtros e índices segundo as consultas reais e usar sincronização incremental; busca vetorial ou reranking podem entrar como portas de recuperação sem alterar validação determinística. Atualmente o catálogo é sincronizado por snapshot completo e o gerador limita candidatos por categoria a quatro para manter tempo e contexto finitos.
+
+## Contratos objetivos
+
+- `priceCents`, SKU, estoque e atributos vêm da API. Quantidades de RAM contam unidades reais e capacidade publicada do kit.
+- `FAIL` confirmado elimina uma montagem. `UNKNOWN` comunica um dado ausente; não é aprovação física, elétrica ou de BIOS.
+- Refinamento só pode referenciar build da própria sessão. O servidor preserva IDs das outras peças quando possível e informa dependências alteradas.
+- Sem teto informado, o servidor declara referência inicial de R$ 8.000, ou R$ 15.000 para pedidos RTX/RX 5070–5090. Nunca apresenta essa referência como orçamento do usuário.
+- O ranking de equilíbrio é heurístico e considera classe/plataforma/custo e prioridade de GPU. Não estima FPS e não promete a configuração matematicamente ótima.
+- Sem modelo conectado, a interface identifica a prévia determinística. Erro de modelo mantém os fatos canônicos e registra fallback.
+- O timeout padrão é 60 s para Ollama/LM Studio locais e 25 s para provedores remotos. `SETUPNINJA_LLM_TIMEOUT_MS` aplica um valor configurável entre 5 e 120 s.
 
 ## Estado e privacidade
 
-SQLite persiste catálogo e montagens, mas histórico e evidências são filtrados pela sessão assinada. Chaves de provedor ficam somente em memória, sem valor inicial ou chave de exemplo. `/api/inspect` expõe catálogo read-only; endpoints de histórico nunca enumeram sessões de terceiros. A sincronização busca uma origem fixa HTTPS, valida o payload completo e limita sua frequência.
+SQLite conserva catálogo, montagens e trilha por cookie de sessão assinado. `rag_runs` guarda pergunta, fontes e resposta entregue; `pc_builds` guarda pedido, SKUs, interpretação, decisão, geração e explicação. Migrações são aditivas. Uma captura embarcada antiga não substitui uma sincronização mais recente já persistida.
 
-A trilha do operador combina dois registros da mesma sessão: `rag_runs` guarda pergunta, fontes, modo e resposta final; `pc_builds` guarda a solicitação, os SKUs oficiais, decisão, interpretação, geração e explicação final. O painel rotula cada caminho separadamente, pois uma montagem determinística não usa a busca FTS5. Instalações SQLite anteriores recebem as novas colunas por migração aditiva; execuções antigas sem texto continuam legíveis.
+Chaves ficam em memória por sessão por até uma hora, sem armazenamento no SQLite ou browser. A inspeção pública é read-only e libera somente tabelas de catálogo; históricos são filtrados pela sessão. Chamadas remotas exigem HTTPS com proteção de origem/endereço; runtimes locais usam allowlist explícita. A importação do catálogo usa URL fixa, valida payload e limita frequência.

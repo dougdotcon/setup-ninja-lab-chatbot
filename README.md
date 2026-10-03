@@ -12,7 +12,7 @@ npm run db:seed
 npm run dev
 ```
 
-A aplicação local atende em `http://127.0.0.1:4174`. Para uma execução de produção local use `npm run build && npm start`. O SQLite fica em `data/setupninja.sqlite`; defina `SETUPNINJA_DATA_DIR` para armazená-lo fora do repositório. O serviço busca a fonte oficial ao iniciar e mantém o snapshot versionado como contingência validada. A sincronização pública tem limite global de uma solicitação por minuto e consulta apenas a URL oficial fixa.
+No desenvolvimento, a interface Vite atende em `http://127.0.0.1:5173` e a API em `http://127.0.0.1:4174`. Para uma execução de produção local use `npm run build && npm start`. O SQLite fica em `data/setupninja.sqlite`; defina `SETUPNINJA_DATA_DIR` para armazená-lo fora do repositório. O serviço busca a fonte oficial ao iniciar e mantém o snapshot versionado como contingência validada. A sincronização pública tem limite global de uma solicitação por minuto e consulta apenas a URL oficial fixa.
 
 ## Catálogo, compatibilidade e limites
 
@@ -24,17 +24,17 @@ Na finalidade gamer, o ranking aplica uma heurística documentada de custo: tent
 
 ## Chat e modelos
 
-Sem credenciais, as respostas usam RAG local sobre a base de tecnologia e o catálogo. A busca FTS5/BM25 recupera fontes e respeita filtros de orçamento antes do top-K. O prompt limita o NinjaRUDEUS a hardware, catálogo e suporte técnico. Perguntas de montagem no próprio chat usam o mesmo montador e as mesmas validações do painel. IDs, preços, estoque e total são renderizados a partir dos registros do servidor, não da prosa do modelo.
+Sem credenciais, as respostas usam RAG local sobre a base de tecnologia e o catálogo. A busca FTS5/BM25 recupera fontes e respeita filtros de orçamento antes do top-K. A política de escopo limita o NinjaRUDEUS a hardware, catálogo e suporte técnico. A LLM devolve contratos JSON estritos com enumerações e IDs limitados; o servidor compõe a persona e os fatos a partir de produtos ou guias oficiais de fabricantes, sem renderizar prosa arbitrária do modelo. Explicações de montagem aceitam até 3 motivos permitidos e planos RAG até 4 fontes recuperadas. Perguntas de montagem no próprio chat usam o mesmo montador e as mesmas validações do painel. IDs, preços, estoque e total são renderizados a partir dos registros do servidor, não da prosa do modelo.
 
 Em **API do modelo**, é possível configurar por sessão um endpoint OpenAI-compatible, OpenAI, Ollama ou LM Studio. Ollama e LM Studio podem usar os endereços locais permitidos no Compose abaixo. As credenciais ficam apenas na memória do processo e não são gravadas em SQLite nem em logs; depois de reiniciar, precisam ser informadas novamente. Nenhuma chave acompanha este repositório.
 
-Typesafe Jev é uma integração separada e opcional para escolha entre IDs de candidatos já validados. Jev recebe opções fechadas e não gera texto de resposta; sem Jev, o ranking determinístico escolhe a opção. A explicação textual usa o provedor de linguagem configurado ou a prévia local. Para verificar conectividade de Jev, configure sua credencial na interface; os testes usam validação isolada e não alegam uma chamada real.
+Typesafe Jev é uma integração separada e opcional para escolha entre IDs de candidatos já validados. Jev recebe opções fechadas e não gera texto de resposta; sem Jev, o ranking determinístico escolhe a opção. O provedor de linguagem seleciona motivos permitidos para a explicação; o renderer usa os fatos canônicos, ou a prévia local quando não há modelo ou a resposta é inválida. Para verificar conectividade de Jev, configure sua credencial na interface; os testes usam validação isolada e não alegam uma chamada real.
 
 ## Dados e segurança
 
 O SQLite guarda catálogo normalizado, categorias, especificações, chunks/índice FTS, execuções de sincronização e sessões. Consultas de histórico e execuções são escopadas pelo cookie assinado. O inspetor público libera somente tabelas de catálogo em modo somente leitura. A configuração de modelo e os builds ficam separados por sessão e expiram; chaves nunca entram na base.
 
-Chamadas externas de modelos exigem HTTPS e endereço público. Redirecionamentos e endereços privados são recusados, exceto os endpoints locais configurados explicitamente em `SETUPNINJA_LOCAL_LLM_URLS` para Ollama/LM Studio. O servidor não encaminha chaves nem envia mensagens a serviços externos sem configuração do usuário.
+Chamadas externas de modelos exigem HTTPS e endereço público. O timeout padrão é de 60 s para runtimes locais e 25 s para provedores remotos; `SETUPNINJA_LLM_TIMEOUT_MS` permite configurar de 5 a 120 s. Redirecionamentos e endereços privados são recusados, exceto os endpoints locais configurados explicitamente em `SETUPNINJA_LOCAL_LLM_URLS` para Ollama/LM Studio. O servidor não encaminha chaves nem envia mensagens a serviços externos sem configuração do usuário.
 
 ## Docker e publicação
 
@@ -67,3 +67,9 @@ Os testes cobrem normalização do snapshot, deduplicação, conflitos e incerte
 Documentação adicional: [fluxos e arquitetura](docs/ARCHITECTURE.md), [fonte e sincronização do catálogo](docs/CATALOG.md), [matriz de compatibilidade](docs/COMPATIBILITY.md), [configuração de provedores](docs/PROVIDERS.md) e [cenários/limites da avaliação](docs/EVALUATION.md).
 
 > O trabalho começou em 02/10/2026 às 18:25 no fuso `America/Sao_Paulo`, conforme registro do projeto.
+
+## Aceitação e experiência
+
+Veja a [matriz completa do desafio](docs/ACCEPTANCE.md), os [diagramas SOLID e RAG](docs/ARCHITECTURE.md), a [configuração Ollama/LM Studio e teste real](docs/PROVIDERS.md), as [evidências de execução](docs/EVALUATION.md) e a [auditoria da experiência de montagem](docs/UX.md). `npm run test:llm` é opt-in: requer runtime realmente disponível e não inclui chave.
+
+A identidade visual usa os assets originais da Setup Ninja e sua paleta escura. O carrinho demonstrativo fica separado do chatbot e permite revisar quantidades e totais; não processa compra. O montador envia as peças escolhidas à validação do servidor.
