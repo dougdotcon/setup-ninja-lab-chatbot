@@ -22,7 +22,10 @@ export function checkBuildCompatibility(build, exceptions = []) {
   const computerCase = build?.case || null;
   const storage = build?.storage || null;
   const selected = [cpu, board, ...memories, gpu, psu, cooler, computerCase, storage].filter(Boolean);
-  const outOfStock = selected.filter((part) => part.inStock === false || Number(part.stockQuantity ?? part.attributes?.stock ?? 1) < 1);
+  const quantities = new Map();
+  for (const part of selected) quantities.set(productId(part), (quantities.get(productId(part)) || 0) + (numeric(part.quantity) ?? 1));
+  const outOfStock = selected.filter((part) => part.inStock === false || !Number.isInteger(numeric(part.quantity) ?? 1) ||
+    (numeric(part.quantity) ?? 1) < 1 || quantities.get(productId(part)) > Number(part.stockQuantity ?? part.attributes?.stock ?? 1));
   rules.push(outOfStock.length
     ? rule('selected-parts-in-stock', 'FAIL', 'Uma ou mais peças selecionadas estão sem estoque.', outOfStock.map((part) => part.name))
     : rule('selected-parts-in-stock', selected.length ? 'PASS' : 'UNKNOWN', selected.length ? 'As peças selecionadas constam disponíveis no catálogo consultado.' : 'Nenhuma peça foi selecionada.'));
@@ -78,23 +81,28 @@ export function checkBuildCompatibility(build, exceptions = []) {
 
   if (!cpu || !psu) rules.push(rule('power-supply-capacity', 'UNKNOWN', 'Selecione processador e fonte para validar a potência.'));
   else {
-    const cpuMinimum = (cpu.attributes?.minimumPowerSupply || []).map(numeric).filter((value) => value !== null);
-    const gpuMinimum = (gpu?.attributes?.minimumPowerSupply || []).map(numeric).filter((value) => value !== null);
+    const cpuRequirements = cpu.attributes?.minimumPowerSupply || [];
+    const gpuRequirements = gpu?.attributes?.minimumPowerSupply || [];
+    const cpuMinimum = cpuRequirements.map(numeric).filter((value) => value !== null);
+    const gpuMinimum = gpuRequirements.map(numeric).filter((value) => value !== null);
     const minimumWatts = Math.max(0, ...cpuMinimum, ...gpuMinimum) || null;
     const supplyWatts = wattsFromName(psu);
     const maxCpuTdp = numeric(psu.attributes?.maxCpuTdp);
     const cpuTdp = numeric(cpu.attributes?.tdp);
+    const needsPfc = [...cpuRequirements, ...gpuRequirements].some((value) => norm(value) === 'pfc');
+    const hasPfc = typeof psu.attributes?.hasPFC === 'boolean' ? psu.attributes.hasPFC : null;
     const insufficientPower = supplyWatts !== null && minimumWatts !== null && supplyWatts < minimumWatts;
     const cpuLimitConflict = maxCpuTdp !== null && cpuTdp !== null && cpuTdp > maxCpuTdp;
-    const missingEvidence = supplyWatts === null || minimumWatts === null || cpuTdp === null || maxCpuTdp === null;
-    const status = insufficientPower || cpuLimitConflict ? 'FAIL' : missingEvidence ? 'UNKNOWN' : 'PASS';
-    const message = status === 'FAIL' ? 'A potência nominal ou o limite de TDP da fonte conflita com os requisitos publicados.'
+    const pfcConflict = needsPfc && hasPfc === false;
+    const missingEvidence = supplyWatts === null || minimumWatts === null || cpuTdp === null || maxCpuTdp === null || (needsPfc && hasPfc === null);
+    const status = insufficientPower || cpuLimitConflict || pfcConflict ? 'FAIL' : missingEvidence ? 'UNKNOWN' : 'PASS';
+    const message = status === 'FAIL' ? (pfcConflict ? 'O requisito publicado pede PFC, mas a fonte informa que não possui PFC.' : 'A potência nominal ou o limite de TDP da fonte conflita com os requisitos publicados.')
       : status === 'UNKNOWN' ? 'A loja não informa todos os dados de potência/limite de TDP; o encaixe elétrico não está completamente confirmado.'
         : `Fonte ${supplyWatts} W cobre a recomendação mínima publicada de ${minimumWatts} W e o limite de TDP de ${maxCpuTdp} W.`;
     rules.push(rule('power-supply-capacity', status, message, [cpu.name, psu.name, ...(gpu ? [gpu.name] : [])]));
   }
 
-  if (!cpu || !cooler) rules.push(rule('cpu-cooler-socket-tdp', cpu?.attributes?.hasCooler === true ? 'PASS' : 'UNKNOWN', cpu?.attributes?.hasCooler === true ? 'O processador indica cooler incluso; o cooler selecionado é opcional.' : 'Sem processador/cooler compatível suficiente para validar soquete e TDP.'));
+  if (!cpu || !cooler) rules.push(rule('cpu-cooler-socket-tdp', cpu?.attributes?.hasCooler === true ? 'PASS' : cpu?.attributes?.hasCooler === false ? 'FAIL' : 'UNKNOWN', cpu?.attributes?.hasCooler === true ? 'O processador indica cooler incluso; o cooler selecionado é opcional.' : cpu?.attributes?.hasCooler === false ? 'O catálogo indica que o processador não inclui cooler; selecione um cooler.' : 'Sem dados suficientes para saber se é necessário escolher um cooler.'));
   else {
     const cpuSocket = socketOf(cpu);
     const coolerSockets = (cooler.attributes?.sockets || []).map((value) => norm(value).replace(/\s+/g, ''));
@@ -110,6 +118,19 @@ export function checkBuildCompatibility(build, exceptions = []) {
   }
 
   rules.push(rule('motherboard-case-form-factor', 'UNKNOWN', 'O catálogo informa o tamanho do gabinete, mas não a lista de formatos de placa-mãe aceitos; não é possível garantir esse encaixe.', board && computerCase ? [board.name, computerCase.name] : []));
+
+  if (cooler && computerCase && (cooler.attributes?.waterCoolerSize || /water\s*cooler|liquid/i.test(cooler.name))) {
+    const radiatorSize = numeric(cooler.attributes?.waterCoolerSize) || Number(String(cooler.name).match(/\b(120|140|240|280|360|420)\s*mm\b/i)?.[1]) || null;
+    const caseSizes = (computerCase.attributes?.waterCoolerSizes || []).map(numeric).filter((value) => value !== null);
+    const positions = ['frontal', 'back', 'lateral', 'bottom', 'top'];
+    const supported = positions.some((position) => numeric(computerCase.attributes?.[`${position}MaxWaterCoolerSize`]) >= radiatorSize);
+    const knownUnsupported = radiatorSize !== null && caseSizes.length > 0 && !caseSizes.includes(radiatorSize) && !supported;
+    const status = knownUnsupported ? 'FAIL' : radiatorSize !== null && (caseSizes.includes(radiatorSize) || supported) ? 'PASS' : 'UNKNOWN';
+    rules.push(rule('radiator-case-fit', status,
+      status === 'FAIL' ? `O gabinete não publica suporte para radiador de ${radiatorSize} mm.`
+        : status === 'PASS' ? `O gabinete lista suporte para radiador de ${radiatorSize} mm.`
+          : 'A loja não publica posições/tamanhos suficientes para confirmar o radiador.', [cooler.name, computerCase.name]));
+  }
 
   if (!gpu || !computerCase) rules.push(rule('gpu-case-clearance', 'UNKNOWN', 'Selecione placa de vídeo e gabinete para validar comprimento.'));
   else {

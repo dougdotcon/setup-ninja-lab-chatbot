@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { normalizeCatalogPayload } from '../server/domain/catalog.js';
 import { checkBuildCompatibility } from '../server/domain/compatibility.js';
+import { buildCandidates, validateCandidateChoice } from '../server/domain/build.js';
 
 const snapshot = JSON.parse(readFileSync(new URL('../data/catalog-api.snapshot.json', import.meta.url), 'utf8'));
 const catalog = normalizeCatalogPayload(snapshot);
@@ -73,4 +74,58 @@ test('power limits, CPU without iGPU, cooler sockets, and unavailable stock fail
   assert.equal(result.rules.find((item) => item.id === 'gpu-case-clearance').status, 'FAIL');
   const unavailable = checkBuildCompatibility({ processor: { ...cpu, inStock: false } });
   assert.equal(unavailable.rules.find((item) => item.id === 'selected-parts-in-stock').status, 'FAIL');
+});
+
+test('stock quantities, PFC, missing included cooler, and radiator clearance are checked', () => {
+  const cpu = part(1, 'processador', 'AMD Ryzen AM4', { socket: 'AM4', hasGpu: true, hasCooler: false, tdp: 65, minimumPowerSupply: [600, 'PFC'] });
+  const ram = part(2, 'memoria', 'RAM 16GB DDR4', { ramCapacity: 16, modulesQuantity: 1 }, { stockQuantity: 1, quantity: 2 });
+  const psu = part(3, 'fonte', 'Fonte 650W', { maxCpuTdp: 100, hasPFC: false });
+  const waterCooler = part(4, 'coolerParaProcessador', 'Water Cooler 240mm AM4', { sockets: ['am4'], tdp: 100, waterCoolerSize: 240 });
+  const casePart = part(5, 'gabinete', 'Gabinete', { waterCoolerSizes: [120], topMaxWaterCoolerSize: 120 });
+  const result = checkBuildCompatibility({ processor: cpu, memory: [ram], powerSupply: psu, cooler: waterCooler, case: casePart });
+  assert.equal(result.rules.find((item) => item.id === 'selected-parts-in-stock').status, 'FAIL');
+  assert.equal(result.rules.find((item) => item.id === 'power-supply-capacity').status, 'FAIL');
+  assert.equal(result.rules.find((item) => item.id === 'cpu-cooler-socket-tdp').status, 'PASS');
+  assert.equal(result.rules.find((item) => item.id === 'radiator-case-fit').status, 'FAIL');
+  const missingCooler = checkBuildCompatibility({ processor: cpu });
+  assert.equal(missingCooler.rules.find((item) => item.id === 'cpu-cooler-socket-tdp').status, 'FAIL');
+});
+
+test('builder uses official stock, one RAM option, and honors a requested GPU within the budget', () => {
+  const official = normalizeCatalogPayload(snapshot);
+  const ids = new Set(['25957237', '28461956', '26461403', '27382267', '25887232', '30950207', '30580341']);
+  const products = official.products.filter((item) => ids.has(item.id) && item.inStock);
+  const requestedGpu = products.find((item) => item.id === '30580341');
+  assert.equal(requestedGpu.attributes.minimumPowerSupply.includes('PFC'), true);
+  assert.equal(buildCandidates({ products, exceptions: official.exceptions, budgetCents: 500000, purpose: 'gaming',
+    memoryGB: 32, dedicatedGpu: true, preferredGpuId: '30580341', limit: 3 }).length, 0);
+  const [candidate] = buildCandidates({ products, exceptions: official.exceptions, budgetCents: 1_500_000, purpose: 'gaming',
+    memoryGB: 32, dedicatedGpu: true, preferredGpuId: '30580341', limit: 3 });
+  assert.ok(candidate);
+  assert.equal(candidate.parts.graphicsCard.id, '30580341');
+  assert.equal(candidate.parts.memory.length, 1);
+  assert.equal(candidate.parts.memory[0].id, '26461403');
+  assert.equal(candidate.parts.memory[0].quantity, 2);
+  assert.equal(candidate.compatibility.rules.find((item) => item.id === 'memory-capacity-and-slots').status, 'PASS');
+  assert.ok(candidate.totalPriceCents <= 1_500_000);
+  assert.ok(Object.values(candidate.parts).flatMap((value) => Array.isArray(value) ? value : value ? [value] : [])
+    .every((part) => official.products.find((record) => record.id === part.id)?.inStock));
+  assert.equal(validateCandidateChoice([candidate], { candidateId: 'invented-id', confidence: 0.99 }, 1_500_000, official.exceptions).reason, 'unknown-candidate');
+  assert.equal(validateCandidateChoice([candidate], { candidateId: candidate.id, confidence: 0.4 }, 1_500_000, official.exceptions).reason, 'low-confidence');
+  assert.equal(validateCandidateChoice([candidate], { candidateId: candidate.id, confidence: 0.9 }, 500_000, official.exceptions).reason, 'over-budget');
+  assert.equal(validateCandidateChoice([candidate], { candidateId: candidate.id, confidence: 0.9 }, 1_500_000, official.exceptions).candidate.id, candidate.id);
+});
+
+test('gamer candidates use bounded platform diversity without inventing performance claims', () => {
+  const official = normalizeCatalogPayload(snapshot);
+  const [candidate] = buildCandidates({ products: official.products, exceptions: official.exceptions,
+    budgetCents: 1_500_000, purpose: 'gaming', memoryGB: 32, dedicatedGpu: true,
+    preferredCpu: 'Ryzen 7', preferredGpuId: '30580341', limit: 1 });
+  assert.ok(candidate);
+  assert.match(candidate.parts.processor.name, /Ryzen 7/i);
+  assert.equal(candidate.parts.graphicsCard.id, '30580341');
+  assert.ok(candidate.totalPriceCents <= 1_500_000);
+  assert.ok(candidate.totalPriceCents > 1_000_000);
+  assert.match(candidate.selectionPolicy, /não é benchmark/);
+  assert.equal(candidate.compatibility.status, 'UNKNOWN');
 });
