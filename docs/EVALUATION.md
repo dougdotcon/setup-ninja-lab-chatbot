@@ -31,30 +31,30 @@ Nenhuma chave de API foi fornecida. Houve teste real do protocolo OpenAI-compati
 
 ## Início informado e commits locais
 
-O início do trabalho foi informado como **02/10/2026 às 18:25 em `America/Sao_Paulo`**. Os commits abaixo representam fases de trabalho reais neste repositório; horas seguem o relógio do host e a autoria Git já configurada, sem data retroativa:
+O início do trabalho foi informado como **02/10/2026 às 18:25 em `America/Sao_Paulo`**. Os commits abaixo representam fases de trabalho reais neste repositório; horas seguem o relógio do host, sem data retroativa. A autoria de todos os 21 commits iniciais foi corrigida para **dougdotcon** em 03/10/2026, com autorização expressa para atualizar o histórico publicado. Árvores, mensagens e datas foram preservadas; os IDs abaixo refletem a correção:
 
 | Commit | Fase |
 |---|---|
-| `1327372` | documentação base |
-| `848bc56` | scaffold da aplicação |
-| `c117d02` | dados demonstrativos iniciais |
-| `0c6cc1f` | backend RAG / SQLite |
-| `71f5e84` | interface de loja e inspeção |
-| `b6510fa` | Docker e HTTPS inicial |
-| `42eb5b1` | normalização da API oficial e regras |
-| `c1fcf01` | migração de catálogo ativo somente para fonte oficial |
-| `f1c077d` | builder e validação determinística |
-| `43f425c` | fluxo conversacional e tela de montagem |
-| `24c2af9` | documentação arquitetura/provedores |
-| `887ded1` | documentação detalhada de catálogo, compatibilidade, provedores e avaliação |
-| `2b6bcd4` | ajuste do ranking gamer para evitar plataformas DDR3 e usar melhor o teto |
-| `cb02eab` | registro da avaliação de R$ 5.000 |
-| `6732bf6` | capacidade de armazenamento gamer e BIOS explicitamente desconhecida |
+| `0dec518` | documentação base |
+| `17dc969` | scaffold da aplicação |
+| `2d9a21c` | dados demonstrativos iniciais |
+| `d006649` | backend RAG / SQLite |
+| `3e857b9` | interface de loja e inspeção |
+| `2b83b67` | Docker e HTTPS inicial |
+| `6cb80ac` | normalização da API oficial e regras |
+| `97bdd2b` | migração de catálogo ativo somente para fonte oficial |
+| `6605eac` | builder e validação determinística |
+| `583a25e` | fluxo conversacional e tela de montagem |
+| `cd5b7e5` | documentação arquitetura/provedores |
+| `0bc9a0c` | documentação detalhada de catálogo, compatibilidade, provedores e avaliação |
+| `2e09777` | ajuste do ranking gamer para evitar plataformas DDR3 e usar melhor o teto |
+| `f6c9ab5` | registro da avaliação de R$ 5.000 |
+| `192178d` | capacidade de armazenamento gamer e BIOS explicitamente desconhecida |
 | `docs: complete commit chronology` | atualização deste próprio histórico |
-| `4afcef4` | pedidos naturais, refinamento múltiplo, guarda do catálogo e verificação de saída do LLM |
-| `7600d70` | testes HTTP dos cenários do desafio, provedor local simulado e persistência SQLite |
+| `ecfb86f` | pedidos naturais, refinamento múltiplo, guarda do catálogo e verificação de saída do LLM |
+| `9e89619` | testes HTTP dos cenários do desafio, provedor local simulado e persistência SQLite |
 | `docs: document verified challenge flows and enable lint` | esta atualização de evidências, arquitetura e análise estática |
-| `b27f269` | trilha por sessão com saídas RAG e montagens, migração SQLite e auditoria na interface |
+| `578bed6` | trilha por sessão com saídas RAG e montagens, migração SQLite e auditoria na interface |
 | `docs: describe answer audit trail and current official source` | documentação da trilha de respostas e da origem ativa do catálogo |
 
-O histórico local/tag `demo-v1` mantém a etapa demonstrativa anterior, mas seus produtos não fazem parte do catálogo ativo do montador. Os commits documentais mais recentes podem ser identificados pelo assunto exato em `git log`. Push ao GitHub depende de autenticação/gravação no remoto e não é inferido a partir do histórico local.
+O histórico local/tag `demo-v1` mantém a etapa demonstrativa anterior, mas seus produtos não fazem parte do catálogo ativo do montador. Os commits documentais mais recentes podem ser identificados pelo assunto exato em `git log`. O histórico e a tag foram publicados em `dougdotcon/setup-ninja-lab-chatbot`; a atualização de autoria usou `force-with-lease` para proteger alterações remotas concorrentes.
