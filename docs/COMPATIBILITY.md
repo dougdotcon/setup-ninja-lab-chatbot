@@ -10,6 +10,7 @@ O motor está em `server/domain/compatibility.js`. Cada regra retorna `PASS`, `F
 | RAM, tipo e capacidade | Tipo DDR, quantidade de módulos, capacidade total e slots/capacidade máxima da placa. Exceção de SKU RAM `25889840` permite somente Intel. | A página não informa tipo, capacidade ou limites necessários. |
 | Fonte | Potência mínima CPU/GPU, atributo PFC explicitamente falso e limite de TDP publicado. | Requisito ou capacidade numérica não foi publicada. Ausência de dado não é aprovação confirmada. |
 | Cooler de CPU | Se CPU não inclui cooler, é obrigatório escolher um. Socket e TDP publicado do cooler precisam cobrir CPU. | SKU não informa cooler incluso, soquete ou TDP suficientes. |
+| BIOS da placa-mãe | Nenhuma regra de atualização é inferida como validada. | `UNKNOWN` até a loja publicar a BIOS instalada e a lista de CPUs suportadas por versão. Confirme suporte/BIOS antes de comprar. |
 | GPU e gabinete | Comprimento publicado da GPU é comparado com espaço máximo publicado do gabinete. | Falta comprimento ou folga. |
 | Radiador e gabinete | Tamanho do water cooler comparado com tamanhos/posições publicadas. | Tamanho/posição do radiador não está descrito. |
 | Placa-mãe e gabinete | Não se assume que Mini/Mid Tower aceitam ATX/mATX. | **Sempre UNKNOWN** quando o catálogo não traz formatos aceitos. |
@@ -22,3 +23,5 @@ A API não traz BIOS instalada, todos os fatores de forma aceitos, todos os cone
 O builder considera somente produtos em estoque e aplica orçamento ao total em centavos. Quantidades repetidas de RAM consomem estoque por SKU. Uma refinada mantém IDs das outras peças quando há candidatos que respeitem o orçamento e as regras; dependências relaxadas são devolvidas ao cliente. Uma escolha Jev passa novamente por este módulo antes de ser aceita.
 
 Para a finalidade gamer, a ordenação tenta aproximar o total de 80% do teto, manter participação mínima de custo na GPU e preferir seis ou mais núcleos quando publicados. Configurações DDR3 antigas recebem grande penalidade quando o teto permite uma alternativa. São sinais transparentes de alocação/era e contagem publicada, não benchmarks ou alegações de que a opção ranqueada vence outra em jogos.
+
+Para montagens gamer com teto de R$ 4.000 ou mais, o storage usa no mínimo 480 GB quando uma opção em estoque cabe no orçamento. Isso é uma preferência de capacidade para jogos, não uma regra de compatibilidade; refinamentos explícitos de storage mantêm o SKU escolhido se ele ainda respeitar o total.

@@ -102,7 +102,15 @@ export function buildCandidates({ products, exceptions = [], budgetCents = Infin
         build.powerSupply = asPart(build.powerSupply);
         build.case = cases.find((item) => !graphicsCard || !attr(graphicsCard, 'maxGpuSize') || !attr(item, 'maxGpuSize') || attr(graphicsCard, 'maxGpuSize') <= attr(item, 'maxGpuSize')) || cases[0] || null;
         build.case = build.case ? asPart(build.case) : null;
-        build.storage = storage[0] ? asPart(storage[0]) : null;
+        const requiredStorage = requiredParts.storage ? storage[0] : null;
+        const minimumGamingStorage = game && budgetCents >= 400_000 && !requiredStorage
+          ? storage.find((item) => {
+            const capacity = String(item.name).match(/\b([0-9]+(?:[.,][0-9]+)?)\s*(GB|TB)\b/i);
+            if (!capacity) return false;
+            const gigabytes = Number(capacity[1].replace(',', '.')) * (/TB/i.test(capacity[2]) ? 1000 : 1);
+            return gigabytes >= 480 && dollars(item) <= Math.max(0, budgetCents - total({ ...build, storage: null }));
+          }) : null;
+        build.storage = (requiredStorage || minimumGamingStorage || storage[0]) ? asPart(requiredStorage || minimumGamingStorage || storage[0]) : null;
         if (attr(processor, 'hasCooler') === false) {
           build.cooler = cheapestCompatible(coolers, (cooler) => {
             const sockets = (attr(cooler, 'sockets') || []).map((item) => item.toLowerCase());

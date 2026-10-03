@@ -118,6 +118,8 @@ export function checkBuildCompatibility(build, exceptions = []) {
   }
 
   rules.push(rule('motherboard-case-form-factor', 'UNKNOWN', 'O catálogo informa o tamanho do gabinete, mas não a lista de formatos de placa-mãe aceitos; não é possível garantir esse encaixe.', board && computerCase ? [board.name, computerCase.name] : []));
+  rules.push(rule('motherboard-bios-support', 'UNKNOWN',
+    'A API não informa a versão de BIOS instalada nem a lista de CPUs suportadas por BIOS; confirme suporte e atualização antes da montagem.', board ? [board.name] : []));
 
   if (cooler && computerCase && (cooler.attributes?.waterCoolerSize || /water\s*cooler|liquid/i.test(cooler.name))) {
     const radiatorSize = numeric(cooler.attributes?.waterCoolerSize) || Number(String(cooler.name).match(/\b(120|140|240|280|360|420)\s*mm\b/i)?.[1]) || null;

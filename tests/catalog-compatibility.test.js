@@ -139,4 +139,6 @@ test('a R$ 5k gaming request avoids legacy DDR3 and favors a viable GPU share', 
   assert.doesNotMatch(candidate.parts.motherboard.name, /DDR3/i);
   assert.ok(Number(candidate.parts.processor.name.match(/\b(\d+)\s*[- ]?cores?\b/i)?.[1]) >= 6);
   assert.ok(candidate.parts.graphicsCard.priceCents / 500_000 >= 0.30);
+  assert.match(candidate.parts.storage.name, /\b(?:480|500)\s*GB\b/i);
+  assert.ok(candidate.compatibility.unknownRules.includes('motherboard-bios-support'));
 });
