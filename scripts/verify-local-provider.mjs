@@ -90,7 +90,8 @@ try {
   assert.equal(guide.status, 200);
   assert.equal(guide.data.telemetry.providerCalled, true);
   assert.ok(guide.data.telemetry.mode.startsWith('api') && !guide.data.telemetry.mode.includes('fallback'));
-  assert.ok(guide.data.citations.length);
+  assert.ok(guide.data.citations.some((source) => source.url?.includes('kingston.com')), 'o guia deve citar a fonte técnica recuperada');
+  assert.match(guide.data.answer, /RAM|memória/i);
   report.cases.push({ name: 'guia-hardware-rag', passed: true, ...guide.data });
   const offTopic = await api(cookie, '/api/chat', { message: 'E qual é a melhor receita de bolo?' });
   assert.equal(offTopic.data.telemetry.outcome, 'fora_escopo');
