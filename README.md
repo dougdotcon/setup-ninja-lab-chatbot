@@ -166,3 +166,18 @@ npm run build
 `npm test` testa domínio e percursos HTTP com provedores simulados, sem chaves. `npm run test:llm` é um teste separado, opt-in, que exige runtime e modelo reais disponíveis; siga [modelos locais](docs/LOCAL_MODELS.md). A avaliação registrada em 03/10/2026 aprovou **28 testes automatizados e nove cenários com Ollama real**; consulte o [relatório](docs/verification/ollama-acceptance.json) para distinguir inferência, mocks e limitações.
 
 O trabalho começou em 02/10/2026 às 18:25 em `America/Sao_Paulo`. O histórico publicado está atribuído a dougdotcon, com commits separados por etapa.
+
+## Desenvolvimento assistido por IA e supervisão
+
+Este projeto foi desenvolvido com assistência dos modelos abaixo, sob supervisão de **DOUGLAS HENRIQUE — [@dougdotcon](https://github.com/dougdotcon)**, responsável pela orientação do projeto, definição dos requisitos, ajustes de escopo e aprovações.
+
+| Modelo | Como foi utilizado |
+|---|---|
+| **GPT-6 Astra** | Planejamento inicial, análise dos requisitos e apoio às decisões de arquitetura nas primeiras etapas. Posteriormente, seu uso foi encerrado por orientação de Douglas. |
+| **GPT-6.1**, com raciocínio alto | Coordenação das etapas seguintes, planejamento, revisão das implementações, resolução de problemas, verificação dos testes, implantação e revisão da documentação. |
+| **GPT-6 Luna**, com raciocínio alto | Execução de tarefas delegadas de implementação, refinamento da interface, auditoria dos fluxos e elaboração de documentação e decisões arquiteturais. |
+| **Qwen2.5 0.5B, via Ollama** | Inferência local para validar a integração do chatbot nos nove cenários de aceitação registrados. Seu papel foi a avaliação do sistema; o runtime temporário foi removido após os testes. |
+
+Os modelos de desenvolvimento auxiliaram a construção do projeto. O provedor que atende o NinjaRUDEUS é configurado separadamente na interface; a aplicação inicia sem modelo ou chave conectados.
+
+**Supervisão e contato:** [Douglas Henrique no GitHub](https://github.com/dougdotcon) · [Douglas Henrique no LinkedIn](https://www.linkedin.com/in/dougdotcon/).
