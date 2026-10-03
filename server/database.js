@@ -124,6 +124,10 @@ export function syncOfficialCatalog(payload, { force = false } = {}) {
   const previous = database.prepare('SELECT last_update FROM catalog_sync_runs WHERE source = ? ORDER BY id DESC LIMIT 1').get(normalized.source);
   const existingOfficial = Number(database.prepare("SELECT COUNT(*) AS count FROM products WHERE source_kind = 'official-monte-seu-pc'").get().count);
   const legacyProducts = Number(database.prepare("SELECT COUNT(*) AS count FROM products WHERE source_kind <> 'official-monte-seu-pc'").get().count);
+  if (previous?.last_update && normalized.lastUpdate && existingOfficial > 0 && legacyProducts === 0 &&
+      Date.parse(normalized.lastUpdate) < Date.parse(previous.last_update)) {
+    return { ...normalized.counts, lastUpdate: previous.last_update, unchanged: true, ignoredStale: true };
+  }
   if (!force && previous?.last_update === normalized.lastUpdate && existingOfficial === normalized.products.length && legacyProducts === 0) {
     return { ...normalized.counts, lastUpdate: normalized.lastUpdate, unchanged: true };
   }
@@ -286,7 +290,7 @@ export function searchCatalog(query, topK = 6, filterQuery = query, categoryCont
   const original = normalized.match(/[a-z0-9]+/g) || [];
   const terms = [...new Set(original.flatMap(tokenToSearch))];
   if (terms.length === 0) return [];
-  let documents = [];
+  let documents;
   try { documents = searchSql.all(terms.join(' OR '), 80); }
   catch { return []; }
 
@@ -324,7 +328,6 @@ export function recordInteraction({ sessionId, query, answer, sources = [], mode
     .replace(/bearer\s+[A-Za-z0-9._~+/=-]{12,}/gi, 'Bearer [credencial removida]');
   insertMessage.run(sessionId, 'user', scrub(query), now);
   insertMessage.run(sessionId, 'assistant', scrub(answer), now);
-  const total = Number(database.prepare('SELECT message_count FROM chat_sessions WHERE id = ?').get(sessionId).message_count);
   const loggedSources = sources.map(({ id, productId, title, url, category, rank }) => ({
     id, productId, title: scrub(title), url, category: scrub(category), score: Math.round((Number(rank) || 0) * 10000) / 10000,
   }));

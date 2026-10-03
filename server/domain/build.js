@@ -38,7 +38,8 @@ function cheapestCompatible(list, test) {
 
 /** Creates bounded complete candidates; every price and stock value comes from the official snapshot. */
 export function buildCandidates({ products, exceptions = [], budgetCents = Infinity, purpose = 'general', memoryGB = 16,
-  dedicatedGpu = false, preferredVendor = null, preferredCpu = null, preferredGpuId = null, excludedVendors = [],
+  dedicatedGpu = false, preferredVendor = null, preferredCpu = null, preferredGpuId = null,
+  preferredGpuVendor = null, gpuPriority = false, excludedVendors = [],
   requiredParts = {}, limit = 4 } = {}) {
   const components = Array.isArray(products) ? products : [];
   let processors = byCategory(components, 'processador');
@@ -48,6 +49,8 @@ export function buildCandidates({ products, exceptions = [], budgetCents = Infin
   if (excludedVendors.length) processors = processors.filter((cpu) => !excludedVendors.includes(cpuVendor(cpu)));
   if (preferredCpu) processors = processors.filter((cpu) => String(cpu.name).toLowerCase().includes(String(preferredCpu).toLowerCase()));
   if (preferredGpuId) gpus = gpus.filter((gpu) => gpu && String(gpu.id) === String(preferredGpuId));
+  if (preferredGpuVendor) gpus = gpus.filter((gpu) => gpu &&
+    (preferredGpuVendor === 'nvidia' ? /nvidia|geforce|\b(?:rtx|gtx|gt)\s*\d/i : /amd|radeon|\brx\s*\d/i).test(gpu.name.toLowerCase()));
   for (const [key, id] of Object.entries(requiredParts)) {
     if (key === 'processor') processors = processors.filter((part) => String(part.id) === String(id));
     if (key === 'graphicsCard') gpus = gpus.filter((part) => part && String(part.id) === String(id));
@@ -72,7 +75,7 @@ export function buildCandidates({ products, exceptions = [], budgetCents = Infin
   const storage = byCategory(components, 'armazenamento').filter((part) => !requiredParts.storage || String(part.id) === String(requiredParts.storage));
   const coolers = byCategory(components, 'coolerParaProcessador').filter((part) => !requiredParts.cooler || String(part.id) === String(requiredParts.cooler));
   const candidates = [];
-  const game = /gam(?:e|ing)|jogo|gamer|render|3d/i.test(purpose);
+  const game = /gam(?:e|ing)|jogo|gamer|render|3d/i.test(purpose) || gpuPriority;
 
   for (const processor of processors) {
     if (preferredVendor && cpuVendor(processor) !== preferredVendor) continue;
@@ -154,7 +157,7 @@ export function buildCandidates({ products, exceptions = [], budgetCents = Infin
     chosen.push(candidate);
     if (chosen.length >= Math.max(1, Math.min(5, Number(limit) || 4))) break;
   }
-  return chosen.map(({ score, ...candidate }) => candidate);
+  return chosen.map(({ score: _score, ...candidate }) => candidate);
 }
 
 export function validateCandidateChoice(candidates, proposal, budgetCents, exceptions = []) {

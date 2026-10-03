@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  Activity, ArrowDownUp, ArrowLeft, ArrowRight, AudioLines, Check, ChevronDown,
+  Activity, ArrowDownUp, ArrowRight, AudioLines, Check, ChevronDown,
   ChevronLeft, ChevronRight, CircleHelp, Cpu, Database, Disc3, Fan, Headphones,
   Heart, House, Keyboard, Menu, MessageCircle, Monitor, Mouse, Network, PanelTop,
   Search, Send, ShieldCheck, ShoppingBag, ShoppingCart, SlidersHorizontal,
   Sparkles, X, Zap,
 } from 'lucide-react';
 import './styles.css';
+import { isPcBuildIntent } from '../shared/request.js';
 
 const CATEGORIES = [
   { label: 'Todos os produtos', slug: 'todos', Icon: House },
@@ -361,8 +362,7 @@ function ChatWidget({ open, setOpen, setPanel, panel }) {
     setBusy(true);
     setMessages((list) => [...list, { id: crypto.randomUUID(), role: 'user', content: message }]);
     try {
-      const buildIntent = /\b(?:monta(?:r|gem)?|monte|build|or[cç]amento de pc|pc gamer|computador gamer|montagem de pc)\b/i.test(message)
-        || (lastBuildId && /\b(?:troca|troque|muda|mude|substitui|substitua|upgrade)\b.*\b(?:placa|gpu|processador|cpu|mem[oó]ria|ram|ssd|fonte|gabinete|cooler)\b/i.test(message));
+      const buildIntent = isPcBuildIntent(message, Boolean(lastBuildId));
       const result = buildIntent
         ? await api('/api/build', { method: 'POST', body: JSON.stringify({ request: message, previousBuildId: lastBuildId || undefined }) })
         : await api('/api/chat', { method: 'POST', body: JSON.stringify({ message }) });
@@ -435,7 +435,7 @@ function ChatWidget({ open, setOpen, setPanel, panel }) {
           </form>
           <div className="chat-footer">
             <button onClick={async () => {
-              try { await api('/api/chat/clear', { method: 'POST', body: JSON.stringify({}) }); } catch {}
+              try { await api('/api/chat/clear', { method: 'POST', body: JSON.stringify({}) }); } catch { /* Keep the local UI responsive if the server is unavailable. */ }
               setMessages([{ id: 'welcome-reset', role: 'assistant', content: 'Sessão limpa. Manda a próxima dúvida de hardware quando quiser.' }]);
             }}>Limpar conversa</button>
             <span><ShieldCheck size={11} /> FONTES DO CATÁLOGO NA RESPOSTA</span>
@@ -915,7 +915,6 @@ function App() {
     setNotice(product.name.slice(0, 52) + ' adicionado à sua sacola.');
   }
   function selectedLabel() { return CATEGORIES.find((item) => item.slug === category)?.label || category; }
-  const timeGreeting = new Date().getHours() < 12 ? 'BOM DIA' : new Date().getHours() < 18 ? 'BOA TARDE' : 'BOA NOITE';
 
   return (
     <div className="application-shell">
