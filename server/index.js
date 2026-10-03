@@ -9,13 +9,14 @@ import {
   clearSession, databasePath, getOfficialBuildData, saveBuild, getSessionBuilds, syncOfficialCatalog,
 } from './database.js';
 import { buildCandidates, validateCandidateChoice } from './domain/build.js';
+import { cpuVendor } from './domain/compatibility.js';
 import { CATEGORY_LABELS } from './domain/catalog.js';
 import { interpretRequest, normalizeRequest } from '../shared/request.js';
 import { defaultModelClient } from './infrastructure/model-client.js';
 import { createOfficialCatalogClient } from './infrastructure/official-catalog-client.js';
 import { defaultTypesafeJev } from './infrastructure/typesafe-jev.js';
 import {
-  allowedBuildReasons, createChatPlanMessages, createInterpretationMessages, isAllowedContextualFollowup, isGreeting,
+  allowedBuildReasons, buildReasonSchema, chatPlanSchema, createChatPlanMessages, createInterpretationMessages, INTERPRETATION_SCHEMA, isAllowedContextualFollowup, isGreeting,
   isHardwareScope, isPromptInjection, renderBuildExplanation, renderChatFallback,
   renderChatPlan, validateBuildPlan, validateChatPlan, validateInterpretation,
 } from './application/assistant-policy.js';
@@ -258,11 +259,17 @@ app.post('/api/build', originGuard, useSession, rateLimit(5), async (req, res) =
   const explicitGpu = typeof req.body?.gpuId === 'string' && req.body.gpuId.length <= 32 ? req.body.gpuId : null;
   const requestedVendor = ['amd', 'intel'].includes(req.body?.cpuVendor) ? req.body.cpuVendor : null;
   const requiredParts = {};
+  const explicitRequiredParts = new Set();
   const refineTargets = new Set();
   for (const key of ['processor', 'motherboard', 'memory', 'graphicsCard', 'powerSupply', 'case', 'storage', 'cooler']) {
     const value = req.body?.requiredParts?.[key];
-    if (typeof value === 'string' && /^\d{3,20}$/.test(value)) requiredParts[key] = value;
+    if (typeof value === 'string' && /^\d{3,20}$/.test(value)) {
+      requiredParts[key] = value;
+      explicitRequiredParts.add(key);
+      refineTargets.add(key);
+    }
   }
+  if (explicitGpu) refineTargets.add('graphicsCard');
   if (previousBuild) {
     const normalized = normalizeRequest(request);
     if (/\b(processador|cpu|ryzen|intel)\b/.test(normalized)) refineTargets.add('processor');
@@ -300,7 +307,7 @@ app.post('/api/build', originGuard, useSession, rateLimit(5), async (req, res) =
   let interpretation = { provider: 'deterministic-input', model: 'campos do formulário', called: false };
   if (language?.model && request) {
     try {
-      const parsed = await modelClient.complete(language, createInterpretationMessages(request), 220, true);
+      const parsed = await modelClient.complete(language, createInterpretationMessages(request), 220, INTERPRETATION_SCHEMA);
       const parsedIntent = validateInterpretation(parsed.answer);
       if (!parsedIntent) throw Error('invalid-interpretation-schema');
       modelIntent = parsedIntent;
@@ -317,7 +324,22 @@ app.post('/api/build', originGuard, useSession, rateLimit(5), async (req, res) =
   let official;
   try { official = getOfficialBuildData(); }
   catch { return res.status(503).json({ error: 'O catálogo oficial está indisponível.' }); }
-  if (modelIntent?.preferredCpu && !processorModel) {
+  if (explicitRequiredParts.has('processor')) {
+    const selectedCpu = official.products.find((item) => String(item.id) === requiredParts.processor
+      && item.categoryKeys.includes('processador') && item.inStock && item.stockQuantity > 0);
+    const selectedCpuVendor = cpuVendor(selectedCpu);
+    if (selectedCpuVendor) {
+      const explicitlyRequestedVendor = requestedVendor || requestIntent.preferredVendor;
+      if (excludedVendors.includes(selectedCpuVendor) || (explicitlyRequestedVendor && explicitlyRequestedVendor !== selectedCpuVendor)) {
+        return res.status(422).json({ error: 'O processador selecionado contradiz uma preferência explícita de plataforma.' });
+      }
+      // An explicit processor SKU identifies the chosen platform and model. Do not
+      // let preferences carried over from a previous build constrain this selection.
+      requirements.preferredVendor = selectedCpuVendor;
+      requirements.preferredCpu = selectedCpu.name;
+    }
+  }
+  if (modelIntent?.preferredCpu && !processorModel && !explicitRequiredParts.has('processor')) {
     const match = official.products.some((item) => item.categoryKeys.includes('processador') && item.inStock
       && normalizeText(item.name).includes(normalizeText(modelIntent.preferredCpu)));
     if (!match) requirements.preferredCpu = null;
@@ -337,7 +359,7 @@ app.post('/api/build', originGuard, useSession, rateLimit(5), async (req, res) =
   const adjustedParts = [];
   if (!candidates.length && previousBuild && refineTargets.size) {
     for (const dependency of new Set([...refineTargets].flatMap((target) => dependentParts[target] || []))) {
-      if (!requiredParts[dependency]) continue;
+      if (!requiredParts[dependency] || explicitRequiredParts.has(dependency)) continue;
       delete requiredParts[dependency]; adjustedParts.push(dependency);
       candidates = buildCandidates({ ...official, budgetCents, purpose: requirements.purpose, memoryGB: requirements.memoryGB,
         dedicatedGpu: requirements.dedicatedGpu, preferredVendor: requirements.preferredVendor,
@@ -371,8 +393,8 @@ app.post('/api/build', originGuard, useSession, rateLimit(5), async (req, res) =
     try {
       const generated = await modelClient.complete(language, [
         { role: 'system', content: 'Selecione razões verdadeiras dentre os IDs permitidos. Não escreva texto. Responda JSON exato: {"reasons":["id"]}, no máximo três itens.' },
-        { role: 'user', content: JSON.stringify({ task: 'BUILD_EXPLANATION_REASON_PLAN', allowedReasons, request: request.replaceAll('<', '＜').replaceAll('>', '＞'), validatedBuild: buildSummary(selected) }) },
-      ], 100, true);
+        { role: 'user', content: JSON.stringify({ task: 'BUILD_EXPLANATION_REASON_PLAN', purpose: requirements.purpose, allowedReasons }) },
+      ], 100, buildReasonSchema(allowedReasons));
       const plan = validateBuildPlan(generated.answer, allowedReasons);
       if (plan) {
         selectedReasons = plan.reasons;
@@ -428,7 +450,7 @@ app.post('/api/chat', originGuard, useSession, rateLimit(18), async (req, res) =
   if (provider?.model && scoped && !hello && !blocked && documents.length) {
     try {
       providerCalled = true;
-      const result = await modelClient.complete(provider, createChatPlanMessages({ query, context: contextText, documents }), 240, true);
+      const result = await modelClient.complete(provider, createChatPlanMessages({ query, context: contextText, documents }), 240, chatPlanSchema(documents));
       const plan = validateChatPlan(result.answer, documents);
       const rendered = renderChatPlan(plan, documents);
       if (rendered) {

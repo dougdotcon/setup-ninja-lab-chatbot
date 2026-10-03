@@ -184,6 +184,39 @@ test('literal challenge journeys preserve official stock, constraints and sessio
   assert.match(refined.refinement.requestedCategory, /memory/);
   assert.match(refined.refinement.requestedCategory, /graphicsCard/);
 
+  const platformSession = await session();
+  const am4ProcessorId = '25957240';
+  const am5ProcessorId = '27613282';
+  const intelProcessorId = '30853799';
+  const am4Build = await build(platformSession, 'Monte um PC gamer com Ryzen 5 até R$ 10.000.', {
+    budget: 10000, requiredParts: { processor: am4ProcessorId },
+  });
+  const am4Parts = verifyBuild(am4Build, 1_000_000);
+  assert.equal(official.get(am4Parts.Processador.id).attributes.socket, 'AM4');
+  const am4MotherboardId = am4Parts['Placa-mãe'].id;
+
+  const crossSocket = await build(platformSession, 'Agora use esta seleção.', {
+    budget: 15000, previousBuildId: am4Build.buildId, cpuVendor: '', requiredParts: { processor: am5ProcessorId },
+  });
+  const crossSocketParts = verifyBuild(crossSocket, 1_500_000);
+  assert.equal(crossSocketParts.Processador.id, am5ProcessorId);
+  assert.equal(official.get(crossSocketParts.Processador.id).attributes.socket, 'AM5');
+  assert.equal(official.get(crossSocketParts['Placa-mãe'].id).attributes.socket, 'AM5');
+  assert.ok(crossSocket.refinement.relaxedDependencies.includes('motherboard'));
+  assert.ok(crossSocket.refinement.relaxedDependencies.includes('memory'));
+
+  const explicitPlatformConflict = await api(platformSession, '/api/build', { request: 'Agora use esta seleção.', budget: 15000,
+    previousBuildId: am4Build.buildId, requiredParts: { processor: am5ProcessorId, motherboard: am4MotherboardId } });
+  assert.equal(explicitPlatformConflict.status, 422);
+  assert.match(explicitPlatformConflict.data.error, /não encontrei uma montagem completa/i);
+
+  const manualIntel = await build(platformSession, 'Agora use esta seleção.', { budget: 15000,
+    previousBuildId: am4Build.buildId, cpuVendor: '', requiredParts: { processor: intelProcessorId },
+  });
+  const manualIntelParts = verifyBuild(manualIntel, 1_500_000);
+  assert.equal(manualIntelParts.Processador.id, intelProcessorId);
+  assert.equal(official.get(manualIntelParts.Processador.id).attributes.socket, 'LGA1700');
+
   const b = await session();
   assert.notEqual(a, b);
   assert.equal((await api(b, '/api/build/history')).data.builds.length, 0);
@@ -224,7 +257,7 @@ test('literal challenge journeys preserve official stock, constraints and sessio
   assert.equal(modelTrace.generation.called, true);
   assert.equal(modelTrace.interpretation.called, true);
   assert.equal(modelTrace.explanation, modelBuild.selected.explanation);
-  assert.ok(mockCalls.some((call) => call.response_format?.type === 'json_object'));
+  assert.ok(mockCalls.some((call) => call.response_format?.type === 'json_schema'));
 
   const providerChat = await api(modelSession, '/api/chat', { message: 'Qual SSD de 1 TB vocês têm?' });
   assert.equal(providerChat.status, 200);
