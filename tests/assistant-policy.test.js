@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  allowedBuildReasons, createChatPlanMessages, createInterpretationMessages, isAllowedContextualFollowup,
+  allowedBuildReasons, buildReasonSchema, chatPlanSchema, createChatPlanMessages, createInterpretationMessages,
+  INTERPRETATION_SCHEMA, isAllowedContextualFollowup, isHardwareScope,
   renderBuildExplanation, renderChatPlan, validateBuildPlan, validateChatPlan,
   validateInterpretation,
 } from '../server/application/assistant-policy.js';
@@ -60,6 +61,11 @@ test('build explanation rejects free text and renders only allowed, validated re
 });
 
 test('interpretation validates exact JSON schema with null for absent preferences', () => {
+  assert.deepEqual(INTERPRETATION_SCHEMA.schema.required,
+    ['purpose', 'memoryGB', 'dedicatedGpu', 'preferredVendor', 'preferredCpu']);
+  assert.equal(INTERPRETATION_SCHEMA.schema.additionalProperties, false);
+  assert.deepEqual(INTERPRETATION_SCHEMA.schema.properties.purpose.enum, ['gaming', 'general', 'workstation', null]);
+  assert.deepEqual(INTERPRETATION_SCHEMA.schema.properties.preferredVendor.enum, ['amd', 'intel', null]);
   const interpretationMessages = createInterpretationMessages('Quero um PC com 32 GB.');
   assert.match(interpretationMessages[0].content, /Extraia preferências explícitas/);
   assert.match(interpretationMessages[0].content, /\{"purpose":null,"memoryGB":null,"dedicatedGpu":null,"preferredVendor":null,"preferredCpu":null\}/);
@@ -74,8 +80,31 @@ test('interpretation validates exact JSON schema with null for absent preference
     preferredVendor: null, preferredCpu: null })), null);
 });
 
+test('dynamic reason and chat schemas restrict enum values to validated candidates and retrieved sources', () => {
+  const allowed = ['within-budget', 'memory-target'];
+  assert.deepEqual(buildReasonSchema(allowed).schema.properties.reasons.items.enum, allowed);
+  assert.equal(buildReasonSchema(allowed).schema.properties.reasons.maxItems, 3);
+  const schema = chatPlanSchema([product, guide]);
+  assert.equal(schema.schema.additionalProperties, false);
+  assert.deepEqual(schema.schema.properties.mode.enum, ['listing', 'comparison', 'hardware-guide', 'clarification']);
+  assert.deepEqual(schema.schema.properties.sourceIds.items.enum, ['17', '26']);
+  assert.equal(schema.schema.properties.sourceIds.maxItems, 4);
+  assert.deepEqual(schema.schema.properties.guideId.enum, ['desktop-memory-install', null]);
+  assert.equal(validateBuildPlan(JSON.stringify({ reasons: ['invented-benchmark'] }), allowed), null);
+  assert.equal(validateChatPlan(JSON.stringify({ mode: 'listing', sourceIds: ['999'], guideId: null }), [product, guide]), null);
+});
+
 test('contextual follow-up does not turn unrelated questions into hardware scope', () => {
   assert.equal(isAllowedContextualFollowup('E qual deles consome menos?'), true);
   assert.equal(isAllowedContextualFollowup('Qual é a capital do país?'), false);
   assert.equal(isAllowedContextualFollowup('E qual país venceu a copa?'), false);
+});
+
+
+test('generic verbs stay out of scope unless a hardware noun or trusted follow-up anchors them', () => {
+  assert.equal(isHardwareScope('Como instalar chuveiro?'), false);
+  assert.equal(isAllowedContextualFollowup('Como instalo isso?'), true);
+  assert.equal(isAllowedContextualFollowup('Esse bolo foi com quais ingredientes?'), false);
+  assert.equal(isAllowedContextualFollowup('Esse filme foi legal?'), false);
+  assert.equal(isHardwareScope('Como instalar memória RAM?'), true);
 });

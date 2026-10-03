@@ -52,13 +52,20 @@ export function createModelClient({
     return isLocal ? 60_000 : 25_000;
   }
 
-  function complete(config, messages, maxTokens = 500, jsonMode = false) {
+  function complete(config, messages, maxTokens = 500, outputFormat = false) {
     const local = ['ollama', 'lmstudio'].includes(config.provider) ? localEndpoint(config.baseUrl) : null;
     const endpoint = local ? Promise.resolve({ url: local, address: null, hostname: local.hostname, requestFn: httpRequest })
       : verifyHttps(config.baseUrl).then((result) => ({ ...result, requestFn: httpsRequest }));
     return endpoint.then(({ url, address, hostname, requestFn }) => new Promise((resolve, reject) => {
+      const schemaRequested = outputFormat && typeof outputFormat === 'object'
+        && typeof outputFormat.name === 'string' && outputFormat.schema && typeof outputFormat.schema === 'object';
+      const supportsSchema = ['openai', 'ollama', 'lmstudio'].includes(config.provider);
+      const responseFormat = schemaRequested
+        ? supportsSchema ? { type: 'json_schema', json_schema: { name: outputFormat.name, strict: true, schema: outputFormat.schema } }
+          : { type: 'json_object' }
+        : outputFormat ? { type: 'json_object' } : undefined;
       const body = JSON.stringify({ model: config.model, messages, max_tokens: maxTokens, temperature: 0.22,
-        ...(jsonMode ? { response_format: { type: 'json_object' } } : {}) });
+        ...(responseFormat ? { response_format: responseFormat } : {}) });
       const request = requestFn({
         hostname, port: Number(url.port || 443),
         path: url.pathname.replace(/\/+$/, '') + '/chat/completions', method: 'POST',

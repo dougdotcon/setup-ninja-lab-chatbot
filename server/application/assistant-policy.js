@@ -3,15 +3,54 @@ const normalizeText = (value) => String(value || '').normalize('NFD').replace(/[
 export const CHAT_MODES = Object.freeze(['listing', 'comparison', 'hardware-guide', 'clarification']);
 const GUIDE_CATEGORY = 'guias de hardware';
 
+export const INTERPRETATION_SCHEMA = Object.freeze({
+  name: 'setupninja_interpretation',
+  schema: {
+    type: 'object', additionalProperties: false,
+    properties: {
+      purpose: { type: ['string', 'null'], enum: ['gaming', 'general', 'workstation', null] },
+      memoryGB: { type: ['integer', 'null'] },
+      dedicatedGpu: { type: ['boolean', 'null'] },
+      preferredVendor: { type: ['string', 'null'], enum: ['amd', 'intel', null] },
+      preferredCpu: { type: ['string', 'null'], enum: ['Ryzen 3', 'Ryzen 5', 'Ryzen 7', 'Ryzen 9',
+        'Core i3', 'Core i5', 'Core i7', 'Core i9', null] },
+    },
+    required: ['purpose', 'memoryGB', 'dedicatedGpu', 'preferredVendor', 'preferredCpu'],
+  },
+});
+
+export function buildReasonSchema(allowedReasons) {
+  return { name: 'setupninja_build_reasons', schema: {
+    type: 'object', additionalProperties: false,
+    properties: { reasons: { type: 'array', maxItems: 3, items: { type: 'string', enum: [...allowedReasons] } } },
+    required: ['reasons'],
+  } };
+}
+
+export function chatPlanSchema(documents) {
+  const guides = documents.filter((doc) => String(doc.category || '').toLowerCase() === GUIDE_CATEGORY);
+  const guideIds = guides.map((doc) => String(doc.guide_id || doc.title));
+  return { name: 'setupninja_chat_plan', schema: {
+    type: 'object', additionalProperties: false,
+    properties: {
+      mode: { type: 'string', enum: [...CHAT_MODES] },
+      sourceIds: { type: 'array', maxItems: 4, items: { type: 'string', enum: documents.map((doc) => String(doc.id)) } },
+      guideId: { type: ['string', 'null'], enum: [...guideIds, null] },
+    },
+    required: ['mode', 'sourceIds', 'guideId'],
+  } };
+}
+
 export function isHardwareScope(text) {
-  return /(?:\b(?:pc|computador|hardware|placa|cpu|gpu|ram|mem[oó]ria|ssd|nvme|sata|processador|ryzen|intel|geforce|radeon|rtx|windows|linux|setup|montar|montagem|fonte|gabinete|cooler|monitor|teclado|mouse|headset|fone|jogo|fps|armazenamento|boot|bios|driver|wifi|wi-fi|ethernet|rede|am4|am5|lga)\b|compatib|tecnolog|perif[eé]ric|water.?cooler|temperatura|superaqu|instalar|upgrade|atualizar|mini.?itx)/i.test(String(text || ''));
+  return /(?:\b(?:pc|computador|hardware|placa|cpu|gpu|ram|mem[oó]ria|ssd|nvme|sata|processador|ryzen|intel|geforce|radeon|rtx|windows|linux|setup|montar|montagem|fonte|gabinete|cooler|monitor|teclado|mouse|headset|fone|jogo|fps|armazenamento|boot|bios|driver|wifi|wi-fi|ethernet|rede|am4|am5|lga)\b|compatib|tecnolog|perif[eé]ric|water.?cooler|temperatura|superaqu|mini.?itx)/i.test(String(text || ''));
 }
 
 export function isAllowedContextualFollowup(text) {
   const query = String(text || '').trim();
   if (!query || isHardwareScope(query)) return false;
   return /^(?:e\s+)?(?:qual|quais)\s+(?:(?:desses|dessas|deles|delas|dentre eles|op[cç][aã]o|produto|pe[cç]a|componente|modelo|placa|processador|mem[oó]ria|fonte|gabinete|ssd|gpu|pre[cç]o|valor|consumo|tamanho|capacidade|custa|serve|funciona)\b|(?:custa menos|é mais barato|vale a pena|tem em estoque|está em estoque))[^?!]{0,90}[?!.]?$/i.test(query)
-    || /^(?:e\s+)?(?:esse|essa|desses|dessas|dos dois|das duas|entre eles|entre elas|mais barato|mais barata|vale a pena|funciona|serve|e o pre[cç]o|quanto custa)[^?!]{0,80}[?!.]?$/i.test(query);
+    || /^(?:e\s+)?(?:esse|essa|isso|desses|dessas|dos dois|das duas|entre eles|entre elas)\s+(?:custa|consome|serve|funciona|é compat[ií]vel|vale a pena|instalo|instalar|atualizo|atualizar)\b[^?!]{0,60}[?!.]?$/i.test(query)
+    || /^(?:e\s+)?(?:como|onde)\s+(?:instalo|instalar|atualizo|atualizar|conecto|configuro)\s+(?:isso|esse|essa|ele|ela|a pe[cç]a|o componente|o processador|a placa|a mem[oó]ria)\b[^?!]{0,50}[?!.]?$/i.test(query);
 }
 
 const exactKeys = (value, keys) => value && typeof value === 'object' && !Array.isArray(value)
