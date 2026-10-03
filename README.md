@@ -1,43 +1,52 @@
 # Setup Ninja Studio
 
-Demonstração responsiva de vitrine inspirada na Setup Ninja com o chatbot **NinjaRUDEUS**, pesquisa SQLite FTS5/BM25, respostas locais determinísticas e conexão opcional a qualquer endpoint de chat OpenAI-compatible.
+Vitrine demonstrativa da Setup Ninja com NinjaRUDEUS, catálogo de componentes oficiais, SQLite/FTS5 e montador determinístico de PCs. O montador só recomenda SKUs disponíveis na captura oficial, soma os preços do catálogo e rejeita conflitos confirmados. Regras para as quais a fonte não traz dados suficientes aparecem como **UNKNOWN**; isso não garante encaixe físico nem desempenho.
 
-## Rodar
+## Executar
 
-Requer Node.js 24+ (usa `node:sqlite`).
+Requisitos: Node.js 24+ (inclui `node:sqlite`).
 
 ```sh
-npm install
+npm ci
 npm run db:seed
-npm run build
-npm start
+npm run dev
 ```
 
-A API e a vitrine servem em `http://127.0.0.1:4174`. O banco fica em `data/setupninja.sqlite`; para mover, informe `SETUPNINJA_DATA_DIR`. A chave do provedor é mantida em memória no processo, isolada por cookie de sessão e removida após uma hora. Sem credencial, o chatbot usa respostas locais e o índice da loja.
+A aplicação local atende em `http://127.0.0.1:4174`. Para uma execução de produção local use `npm run build && npm start`. O SQLite fica em `data/setupninja.sqlite`; defina `SETUPNINJA_DATA_DIR` para armazená-lo fora do repositório. O serviço busca a fonte oficial ao iniciar e mantém o snapshot versionado como contingência validada. A sincronização pública tem limite global de uma solicitação por minuto e consulta apenas a URL oficial fixa.
 
-## Catálogo e limites da extração
+## Catálogo, compatibilidade e limites
 
-`data/products.json` contém 45 ofertas que foram identificadas com preço publicado nas páginas públicas da loja; a data e URLs de referência estão em `data/scrape-report.json`. A loja bloqueou requisições HTTP diretas (403), então a captura de catálogo é parcial e reconstruída de páginas indexadas. Não há produtos avulsos inventados: componentes mencionados numa configuração de PC aparecem somente como especificações do kit. Outros departamentos verificados existem em `data/categories.json` com contagem zero até que uma listagem individual verificável possa ser coletada. Duas fotos oficiais do CDN estão vinculadas aos respectivos produtos; itens restantes usam ilustração geométrica, não foto alheia.
+A origem é o configurador oficial [`monte-seu-pc.setupninja.com.br/produtos`](https://monte-seu-pc.setupninja.com.br/produtos). O snapshot versionado em `data/catalog-api.snapshot.json` contém 1.238 anúncios de categoria e 1.236 IDs únicos após deduplicação; 749 estão disponíveis e 487 sem estoque. A API pode mudar esses números entre atualizações. O catálogo conserva preço, estoque, categoria, atributos publicados, imagem CDN e link da fonte. Produtos sem estoque aparecem na consulta administrativa, mas nunca entram no RAG de recomendação nem no montador.
 
-A página original não pôde ser acessada para captura automatizada direta; cores, hierarquia e padrões de loja observados foram reconstituídos para uma demonstração, sem afirmar fidelidade pixel a pixel. Preço e disponibilidade podem mudar. Esta aplicação não processa compras.
+`server/domain/compatibility.js` executa verificações puras para estoque/quantidade, socket CPU/placa-mãe, tipo e capacidade da memória, vídeo integrado, potência/PFC da fonte, TDP e compatibilidade do cooler e limites dimensionais que a API descreve. `server/domain/build.js` combina candidatos com limite de preço, memória, CPU/GPU preferidos e restrições de peças fixas durante refinamentos. A ordenação gamer é uma heurística por custo de componentes, sem benchmarks ou promessas de FPS. Com 15 mil reais, Ryzen 7 + RTX 5070 + 32 GB, a amostra atual escolhe uma montagem de R$ 11.044,61; não promete gastar o teto nem que essa seja a melhor configuração de desempenho.
+
+O catálogo não declara todos os formatos de placa aceitos pelos gabinetes, interfaces/slots de armazenamento, conectores de fonte ou medições de desempenho. Esses casos ficam como `UNKNOWN` e aparecem no resultado para revisão. Produtos e preços mudam no site original; a demonstração não fecha pedidos nem processa pagamentos.
+
+## Chat e modelos
+
+Sem credenciais, as respostas usam RAG local sobre a base de tecnologia e o catálogo. A busca FTS5/BM25 recupera fontes e respeita filtros de orçamento antes do top-K. O prompt limita o NinjaRUDEUS a hardware, catálogo e suporte técnico. Perguntas de montagem no próprio chat usam o mesmo montador e as mesmas validações do painel. IDs, preços, estoque e total são renderizados a partir dos registros do servidor, não da prosa do modelo.
+
+Em **API do modelo**, é possível configurar por sessão um endpoint OpenAI-compatible, OpenAI, Ollama ou LM Studio. Ollama e LM Studio podem usar os endereços locais permitidos no Compose abaixo. As credenciais ficam apenas na memória do processo e não são gravadas em SQLite nem em logs; depois de reiniciar, precisam ser informadas novamente. Nenhuma chave acompanha este repositório.
+
+Typesafe Jev é uma integração separada e opcional para escolha entre IDs de candidatos já validados. Jev recebe opções fechadas e não gera texto de resposta; sem Jev, o ranking determinístico escolhe a opção. A explicação textual usa o provedor de linguagem configurado ou a prévia local. Para verificar conectividade de Jev, configure sua credencial na interface; os testes usam validação isolada e não alegam uma chamada real.
 
 ## Dados e segurança
 
-O schema SQLite inclui `categories`, `products`, `product_categories`, `product_specs`, `knowledge_chunks`, `knowledge_fts`, `scrape_runs`, `chat_sessions`, `chat_messages` e `rag_runs`. O inspetor global libera apenas as sete tabelas do catálogo; histórico e rastros ficam escopados ao cookie assinado desta sessão. O prompt limita respostas ao catálogo e tecnologia; FTS5 recupera até oito fontes, aplica orçamento antes do top-K e salva os documentos citados junto à execução, sem registrar chain-of-thought ou chaves.
+O SQLite guarda catálogo normalizado, categorias, especificações, chunks/índice FTS, execuções de sincronização e sessões. Consultas de histórico e execuções são escopadas pelo cookie assinado. O inspetor público libera somente tabelas de catálogo em modo somente leitura. A configuração de modelo e os builds ficam separados por sessão e expiram; chaves nunca entram na base.
 
-Conexão de API requer HTTPS com DNS público; endereços privados, redirecionamentos e origens cruzadas são rejeitados. A URL e a credencial são guardadas apenas na memória da sessão.
+Chamadas externas de modelos exigem HTTPS e endereço público. Redirecionamentos e endereços privados são recusados, exceto os endpoints locais configurados explicitamente em `SETUPNINJA_LOCAL_LLM_URLS` para Ollama/LM Studio. O servidor não encaminha chaves nem envia mensagens a serviços externos sem configuração do usuário.
 
-## Rodar em Docker
+## Docker e publicação
 
 ```sh
 docker compose up --build -d
-docker compose logs -f web
 docker compose ps
+docker compose logs -f web
 ```
 
-O Compose serve em `127.0.0.1:4174`, reinicia após falha/reboot, executa como usuário não-root e verifica `/api/health`. O volume nomeado `setupninja_data` mantém o SQLite em `/var/lib/setupninja` entre atualizações e reinícios. O Nginx do host encaminha `setupninja.douvras.com` para essa porta local.
+O Compose expõe somente `127.0.0.1:4174`, executa como usuário não-root, usa volume persistente para SQLite e reinicia após falha/reboot. Nginx encaminha `https://setupninja.douvras.com` para a porta local. Para usar um modelo Ollama/LM Studio instalado no host Docker, configure-o para ouvir na interface acessível pelo contêiner e permita sua porta no firewall; os endereços preconfigurados são `host.docker.internal:11434` e `:1234`. A máquina de um visitante não é o host do servidor.
 
-Para backup consistente, pare brevemente o container, copie o volume e retome:
+Para backup consistente, pare o contêiner durante a cópia do volume:
 
 ```sh
 docker compose stop web
@@ -45,8 +54,13 @@ docker run --rm -v setupninja_setupninja_data:/data:ro -v "$PWD":/backup alpine 
 docker compose start web
 ```
 
-TLS depende de o DNS do subdomínio apontar para o host Nginx; após emitir o certificado, altere `COOKIE_SECURE` para `true` no `compose.yaml` e recrie o serviço. Esta instância usa HTTP enquanto valida o apontamento. Nenhuma chave de API vem embutida na imagem.
+## Verificação
 
-> O projeto teve início em 02/10/2026 às 18:25 no fuso `America/Sao_Paulo`, conforme o registro de início solicitado.
+```sh
+npm test
+npm run build
+```
 
-O snapshot do endpoint oficial de produtos fica em `data/catalog-api.snapshot.json`; `data/catalog-api.snapshot-meta.json` registra a fonte, atualização informada pela API e SHA-256. `data/products.json` é a pequena amostra da vitrine reconstruída da loja original, distinta do catálogo oficial completo.
+Os testes cobrem normalização do snapshot, deduplicação, conflitos e incertezas, estoque por quantidade, regras de RAM/fonte/cooler, teto de preço, filtros de componentes e seleção Jev de candidatos fechados. A cobertura não substitui ensaio elétrico, medição de desempenho ou validação física da montagem.
+
+> O trabalho começou em 02/10/2026 às 18:25 no fuso `America/Sao_Paulo`, conforme registro do projeto.

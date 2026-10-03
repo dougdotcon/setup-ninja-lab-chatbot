@@ -1,0 +1,66 @@
+# Arquitetura do montador e do atendimento
+
+## Componentes
+
+```mermaid
+flowchart LR
+  Browser[Loja, chat e inspetores] --> Routes[Express API]
+  Routes --> Sessions[Cookie assinado e escopo por sessão]
+  Routes --> CatalogService[Sincronização oficial]
+  Routes --> BuildDomain[Combinação e compatibilidade]
+  Routes --> Retrieval[RAG FTS5 BM25]
+  CatalogService --> Source[API oficial Setup Ninja]
+  CatalogService --> SQLite[(SQLite)]
+  BuildDomain --> SQLite
+  Retrieval --> SQLite
+  Routes -. opcional .-> Jev[Typesafe Jev: escolhe ID fechado]
+  Routes -. opcional .-> TextModel[OpenAI-compatible / Ollama / LM Studio]
+```
+
+O projeto separa normalização de catálogo (`server/domain/catalog.js`), regras de compatibilidade (`server/domain/compatibility.js`), geração/validação de montagens (`server/domain/build.js`), persistência SQLite (`server/database.js`) e rotas/transporte HTTP (`server/index.js`). As regras de domínio recebem objetos e não fazem chamadas de rede. O browser nunca decide compatibilidade, total ou estoque.
+
+## Fluxo de montagem
+
+```mermaid
+sequenceDiagram
+  actor U as Pessoa
+  participant API as API da aplicação
+  participant L as Modelo de linguagem (opcional)
+  participant D as Domínio determinístico
+  participant J as Jev (opcional)
+  participant DB as SQLite oficial
+  U->>API: pedido natural + teto + sessão
+  opt interpretação estruturada conectada
+    API->>L: extrair intenção e preferências
+    L-->>API: JSON limitado por schema
+  end
+  API->>D: requisitos + IDs fixos da montagem anterior
+  D->>DB: produtos oficiais disponíveis
+  D->>D: combinar, somar, aplicar regras e orçamento
+  D-->>API: 1–5 candidatos verificados
+  opt decisão Jev configurada
+    API->>J: escolha entre IDs fechados, sem alterar teto
+    J-->>API: ID e confiança
+  end
+  API->>D: revalidar candidato escolhido
+  opt provedor textual configurado
+    API->>L: explicar apenas configuração validada
+    L-->>API: texto sujeito a validação
+  end
+  API->>DB: persistir itens, preço e evidências da sessão
+  API-->>U: SKUs, estoque, preço, total e incertezas
+```
+
+## Contratos e limites
+
+- `priceCents` e estoque vêm do catálogo oficial; IDs selecionados pertencem à lista em estoque. Quantidades são verificadas por SKU e por módulos de RAM.
+- Compatibilidade retorna `PASS`, `FAIL` ou `UNKNOWN`. Falhas confirmadas removem uma opção; ausência de informação permanece visível e não vira aprovação.
+- Preferências e orçamento são restrições do servidor. Propostas de Jev só aceitam IDs apresentados e passam pelas regras novamente. Jev seleciona, não gera resposta textual.
+- O modelo de linguagem pode interpretar e explicar, mas não fornece os valores finais. A interface renderiza preços/IDs/estoque da resposta canônica do backend.
+- Um refinamento referencia um build anterior da mesma sessão e tenta preservar os IDs das demais peças. Dependências que precisem mudar são reportadas.
+- A classificação/score gamer é uma regra aproximada baseada em custo, sem benchmarks. Não há garantia de FPS, estabilidade elétrica ou montagem física.
+- Sem chave/API conectada, o modo local responde deterministicamente; a interface o identifica como prévia.
+
+## Estado e privacidade
+
+SQLite persiste catálogo e montagens, mas histórico e evidências são filtrados pela sessão assinada. Chaves de provedor ficam somente em memória, sem valor inicial ou chave de exemplo. `/api/inspect` expõe catálogo read-only; endpoints de histórico nunca enumeram sessões de terceiros. A sincronização busca uma origem fixa HTTPS, valida o payload completo e limita sua frequência.
