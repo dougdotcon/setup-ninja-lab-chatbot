@@ -63,4 +63,6 @@ npm run build
 
 Os testes cobrem normalização do snapshot, deduplicação, conflitos e incertezas, estoque por quantidade, regras de RAM/fonte/cooler, teto de preço, filtros de componentes e seleção Jev de candidatos fechados. A cobertura não substitui ensaio elétrico, medição de desempenho ou validação física da montagem.
 
+Documentação adicional: [fluxos e arquitetura](docs/ARCHITECTURE.md), [fonte e sincronização do catálogo](docs/CATALOG.md), [matriz de compatibilidade](docs/COMPATIBILITY.md), [configuração de provedores](docs/PROVIDERS.md) e [cenários/limites da avaliação](docs/EVALUATION.md).
+
 > O trabalho começou em 02/10/2026 às 18:25 no fuso `America/Sao_Paulo`, conforme registro do projeto.
