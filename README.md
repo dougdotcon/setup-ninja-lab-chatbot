@@ -1,8 +1,56 @@
-# Setup Ninja Studio · NinjaRUDEUS
+<p align="center">
+  <img src="docs/assets/readme-brand.svg" alt="Logo original Setup Ninja em cartão escuro com detalhe laranja" width="480">
+</p>
 
-Demonstração de marketplace com montador de PCs, chatbot de hardware, catálogo oficial em SQLite e painéis para inspecionar dados e respostas. A LLM interpreta pedidos e seleciona planos de resposta; o servidor controla SKU, estoque, quantidades, preços, orçamento e compatibilidade.
+<h1 align="center">Setup Ninja Studio · NinjaRUDEUS</h1>
 
-**Demonstração publicada:** [setupninja.douvras.com](https://setupninja.douvras.com) · **Código:** [dougdotcon/setup-ninja-lab-chatbot](https://github.com/dougdotcon/setup-ninja-lab-chatbot)
+<p align="center">Demonstração de marketplace com montador de PCs, chatbot de hardware, catálogo oficial em SQLite e painéis para inspecionar dados e respostas. A LLM interpreta pedidos e seleciona planos de resposta; o servidor controla SKU, estoque, quantidades, preços, orçamento e compatibilidade.</p>
+
+<p align="center">
+  <a href="https://setupninja.douvras.com"><img alt="Demonstração ao vivo" src="https://img.shields.io/badge/Demo-setupninja.douvras.com-ff7300?style=flat-square"></a>
+  <a href="docs/LOCAL_DEVELOPMENT.md"><img alt="Node.js 24 ou superior" src="https://img.shields.io/badge/Node.js-24%2B-339933?style=flat-square&logo=nodedotjs&logoColor=white"></a>
+  <a href="docs/ARCHITECTURE.md"><img alt="React 19" src="https://img.shields.io/badge/React-19-555555?style=flat-square&logo=react&logoColor=61DAFB"></a>
+  <a href="docs/LOCAL_DEVELOPMENT.md"><img alt="Docker Compose v2" src="https://img.shields.io/badge/Docker%20Compose-v2-555555?style=flat-square&logo=docker&logoColor=2496ED"></a>
+  <a href="docs/DECISIONS.md"><img alt="SQLite com FTS5" src="https://img.shields.io/badge/SQLite-FTS5-555555?style=flat-square&logo=sqlite&logoColor=003B57"></a>
+  <a href="docs/ARCHITECTURE.md"><img alt="RAG lexical com FTS5 e BM25" src="https://img.shields.io/badge/RAG-lexical%20%2F%20FTS5%20%2B%20BM25-ff7300?style=flat-square"></a>
+  <a href="docs/EVALUATION.md"><img alt="Avaliação registrada: 28 testes e 9 cenários Ollama em 03/10/2026" src="https://img.shields.io/badge/Avalia%C3%A7%C3%A3o-28%20testes%20%2B%209%20Ollama%20%7C%2003%2F10%2F2026-555555?style=flat-square"></a>
+</p>
+
+<p align="center">
+  <a href="https://setupninja.douvras.com">Demonstração</a> ·
+  <a href="#começar-localmente-com-docker">Instalar</a> ·
+  <a href="#documentação">Documentação</a> ·
+  <a href="docs/DECISIONS.md">Decisões</a> ·
+  <a href="https://github.com/dougdotcon/setup-ninja-lab-chatbot">Código</a>
+</p>
+
+> A avaliação de 03/10/2026 é um registro desta execução; os cenários Ollama exigem runtime real e não fazem parte da CI.
+
+## Veja a demonstração
+
+<p align="center"><a href="https://setupninja.douvras.com"><img src="docs/screenshots/storefront-desktop.png" alt="Vitrine Setup Ninja em desktop, com busca e categorias de componentes" width="100%"></a></p>
+
+<details>
+  <summary>Montador em desktop</summary>
+  <p align="center"><img src="docs/screenshots/demo-builder-desktop.png" alt="Montador de PC em desktop com peças selecionadas, total e avisos de compatibilidade" width="100%"></p>
+</details>
+
+<details>
+  <summary>Montador e chat em telas móveis</summary>
+  <table>
+    <tr>
+      <td><img src="docs/screenshots/demo-builder-mobile.png" alt="Montador de PC em tela móvel, com lista de componentes e total" width="100%"></td>
+      <td><img src="docs/screenshots/demo-chat-mobile.png" alt="Chat NinjaRUDEUS em tela móvel, com resposta e fontes de hardware" width="100%"></td>
+    </tr>
+  </table>
+</details>
+
+<details>
+  <summary>Revisão do carrinho demonstrativo</summary>
+  <p align="center"><img src="docs/screenshots/demo-cart.png" alt="Carrinho demonstrativo com quantidades de peças e subtotal" width="100%"></p>
+</details>
+
+**Nesta página:** [Começar localmente com Docker](#começar-localmente-com-docker) · [Desenvolver sem Docker](#desenvolver-sem-docker) · [Experimentar o demonstrativo](#experimentar-o-demonstrativo) · [Como funciona](#como-funciona) · [Documentação](#documentação) · [Verificar alterações](#verificar-alterações)
 
 ## Começar localmente com Docker
 
