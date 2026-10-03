@@ -51,10 +51,24 @@ test('literal challenge journeys preserve official stock, constraints and sessio
     req.on('end', () => {
       const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
       mockCalls.push(body);
-      const interpretation = body.response_format?.type === 'json_object';
-      const content = interpretation
-        ? JSON.stringify({ purpose: 'gaming', memoryGB: 16, dedicatedGpu: true, preferredVendor: null, preferredCpu: null, preferredGpuId: '999999999' })
-        : mockMode === 'invalid' ? 'Compre RTX 9999 por R$ 1.' : 'Escolhi uma montagem equilibrada para o seu uso. Confira os pontos pendentes antes de comprar.';
+      const systemText = body.messages?.[0]?.content || '';
+      let content;
+      if (!body.response_format) content = 'OK';
+      else if (mockMode === 'malformed') content = '{json quebrado';
+      else if (/Extraia preferências/.test(systemText)) {
+        content = JSON.stringify({ purpose: 'gaming', memoryGB: 16, dedicatedGpu: true, preferredVendor: null, preferredCpu: null });
+      } else if (/razões verdadeiras dentre os IDs permitidos/.test(systemText)) {
+        const task = JSON.parse(body.messages.at(-1).content);
+        content = JSON.stringify({ reasons: mockMode === 'invalid' ? ['invented-performance'] : task.allowedReasons.slice(0, 2) });
+      } else {
+        const task = JSON.parse(body.messages.at(-1).content);
+        const productSource = task.availableSources.find((source) => source.kind === 'product');
+        const guideSource = task.availableSources.find((source) => source.kind === 'guide');
+        content = mockMode === 'invalid' ? JSON.stringify({ mode: 'listing', sourceIds: ['999999'], guideId: null })
+          : guideSource && /instalar|mem[oó]ria|bios|processador/i.test(task.question)
+            ? JSON.stringify({ mode: 'hardware-guide', sourceIds: [], guideId: guideSource.guideId })
+            : JSON.stringify({ mode: 'listing', sourceIds: productSource ? [productSource.id] : [], guideId: null });
+      }
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ choices: [{ message: { content } }], usage: { prompt_tokens: 10, completion_tokens: 20 } }));
     });
@@ -103,11 +117,40 @@ test('literal challenge journeys preserve official stock, constraints and sessio
     return response.data;
   }
 
+  const optionsResponse = await fetch(base + '/api/build/options');
+  assert.equal(optionsResponse.status, 200);
+  const buildOptions = await optionsResponse.json();
+  const optionKeys = ['processor', 'motherboard', 'memory', 'graphicsCard', 'powerSupply', 'case', 'storage', 'cooler'];
+  assert.deepEqual(Object.keys(buildOptions.parts).sort(), [...optionKeys].sort());
+  for (const key of optionKeys) {
+    assert.ok(buildOptions.parts[key].length > 0, `opções em estoque ausentes para ${key}`);
+    for (const option of buildOptions.parts[key]) {
+      assert.ok(official.get(option.id)?.inStock, `${key} deve conter apenas SKU oficial disponível`);
+      assert.equal(option.stockQuantity, official.get(option.id).stockQuantity);
+      assert.equal(option.availableQuantity, option.stockQuantity);
+      assert.ok(option.name && Number.isInteger(option.priceCents) && option.category);
+    }
+  }
+
   const a = await session();
   const noIntel = await build(a, 'Quero um PC para jogar em 1440p, mas não quero Intel. Até R$ 7.000.');
   const noIntelParts = verifyBuild(noIntel, 700_000);
   assert.match(noIntelParts.Processador.name, /AMD|Ryzen/i);
   assert.doesNotMatch(noIntelParts['Placa-mãe'].name, /DDR3/i);
+
+  const selectedPartKey = { Processador: 'processor', 'Placa-mãe': 'motherboard', Memória: 'memory',
+    'Placa de vídeo': 'graphicsCard', Fonte: 'powerSupply', Gabinete: 'case', Armazenamento: 'storage', Cooler: 'cooler' };
+  const requiredParts = Object.fromEntries(noIntel.selected.items.filter((item) => selectedPartKey[item.category])
+    .map((item) => [selectedPartKey[item.category], item.id]));
+  const exactParts = await build(await session(), 'Quero um PC para jogar em 1440p, mas não quero Intel. Até R$ 7.000.',
+    { budget: 7000, requiredParts });
+  const exactPartsValid = verifyBuild(exactParts, 700_000);
+  assert.notEqual(exactParts.selected.compatibility.status, 'FAIL');
+  for (const [label, key] of Object.entries(selectedPartKey)) {
+    if (!requiredParts[key]) continue;
+    const picked = exactPartsValid[label];
+    assert.ok(picked && requiredParts[key] === picked.id, `${key} obrigatório deve ser preservado`);
+  }
 
   const gpuPriority = await build(a, 'Tenho R$ 7.000. Prefiro gastar mais na placa de vídeo.');
   const priorityParts = verifyBuild(gpuPriority, 700_000);
@@ -161,9 +204,11 @@ test('literal challenge journeys preserve official stock, constraints and sessio
   assert.equal(rag.status, 200);
   assert.ok(rag.data.telemetry.retrieved > 0);
   assert.ok(rag.data.citations.every((item) => official.get(item.productId)?.inStock));
+  const offTopicFollowup = await api(b, '/api/chat', { message: 'E qual país venceu a copa?' });
+  assert.equal(offTopicFollowup.data.telemetry.outcome, 'fora_escopo');
+  assert.equal(offTopicFollowup.data.telemetry.providerCalled, false);
   const ragRuns = (await api(b, '/api/chat/runs')).data.runs;
-  assert.equal(ragRuns.length, 3);
-  assert.equal(ragRuns[0].answer, rag.data.answer);
+  assert.equal(ragRuns.length, 4);
 
   const modelSession = await session();
   const configured = await api(modelSession, '/api/model/config', { provider: 'ollama', baseUrl: `http://127.0.0.1:${modelPort}/v1`, model: 'local-test' });
@@ -180,7 +225,48 @@ test('literal challenge journeys preserve official stock, constraints and sessio
   assert.equal(modelTrace.interpretation.called, true);
   assert.equal(modelTrace.explanation, modelBuild.selected.explanation);
   assert.ok(mockCalls.some((call) => call.response_format?.type === 'json_object'));
-  assert.ok(mockCalls.some((call) => !call.response_format));
+
+  const providerChat = await api(modelSession, '/api/chat', { message: 'Qual SSD de 1 TB vocês têm?' });
+  assert.equal(providerChat.status, 200);
+  assert.equal(providerChat.data.telemetry.outcome, 'respondido');
+  assert.equal(providerChat.data.telemetry.providerCalled, true);
+  assert.ok(providerChat.data.citations.length > 0);
+  const providerOffTopic = await api(modelSession, '/api/chat', { message: 'E qual país venceu a copa?' });
+  assert.equal(providerOffTopic.data.telemetry.outcome, 'fora_escopo');
+  assert.equal(providerOffTopic.data.telemetry.providerCalled, false);
+
+  const explicitRefinement = await build(modelSession, 'Quero Ryzen 7 com 32 GB para edição de vídeo.', { budget: 8000 });
+  const explicitParts = verifyBuild(explicitRefinement, 800_000);
+  assert.match(explicitParts.Processador.name, /Ryzen 7/i);
+  assert.ok(explicitParts.Memória.quantity * official.get(explicitParts.Memória.id).attributes.ramCapacity >= 32);
+  assert.equal(explicitRefinement.telemetry.referenceBudget, false);
+  const explicitHistory = (await api(modelSession, '/api/build/history')).data.builds;
+  assert.equal(explicitHistory[0].purpose, 'workstation', 'a interpretação LLM não pode sobrepor o propósito explícito');
+  const preservedMemory = await build(modelSession, 'Agora quero GPU NVIDIA.', { previousBuildId: explicitRefinement.buildId });
+  const preservedParts = verifyBuild(preservedMemory, 800_000);
+  assert.match(preservedParts['Placa de vídeo'].name, /nvidia|geforce|\b(?:rtx|gtx|gt)\s*\d/i);
+  assert.ok(preservedParts.Memória.quantity * official.get(preservedParts.Memória.id).attributes.ramCapacity >= 32);
+
+  const lmstudioSession = await session();
+  const lmstudio = await api(lmstudioSession, '/api/model/config', { provider: 'lmstudio', baseUrl: `http://127.0.0.1:${modelPort}/v1`, model: 'local-test' });
+  assert.equal(lmstudio.status, 200, JSON.stringify(lmstudio.data));
+  const lmstudioTest = await api(lmstudioSession, '/api/model/test', {});
+  assert.equal(lmstudioTest.status, 200, JSON.stringify(lmstudioTest.data));
+  assert.equal(lmstudioTest.data.answer, 'OK');
+
+  const guidesSession = await session();
+  const guide = await api(guidesSession, '/api/chat', { message: 'Como instalar memória RAM no desktop?' });
+  assert.equal(guide.status, 200);
+  assert.match(guide.data.answer, /desconecte o cabo de energia/i);
+  assert.ok(guide.data.citations.some((source) => source.url.includes('kingston.com')));
+
+  const malformedSession = await session();
+  await api(malformedSession, '/api/model/config', { provider: 'ollama', baseUrl: `http://127.0.0.1:${modelPort}/v1`, model: 'local-test' });
+  mockMode = 'malformed';
+  const malformed = await api(malformedSession, '/api/chat', { message: 'Como instalar memória RAM no desktop?' });
+  assert.equal(malformed.status, 200);
+  assert.equal(malformed.data.telemetry.outcome, 'fallback_plano_invalido');
+  assert.match(malformed.data.answer, /desconecte o cabo de energia/i);
 
   mockMode = 'invalid';
   const hallucination = await build(modelSession, 'Quero um PC gamer de até R$ 5.000.');
@@ -190,6 +276,6 @@ test('literal challenge journeys preserve official stock, constraints and sessio
   const chatHallucination = await api(modelSession, '/api/chat', { message: 'Qual SSD de 1 TB vocês têm?' });
   assert.equal(chatHallucination.status, 200);
   assert.equal(chatHallucination.data.telemetry.providerCalled, true);
-  assert.equal(chatHallucination.data.telemetry.outcome, 'fallback_resposta_sem_fonte');
+  assert.equal(chatHallucination.data.telemetry.outcome, 'fallback_plano_invalido');
   assert.doesNotMatch(chatHallucination.data.answer, /RTX 9999/i);
 });
