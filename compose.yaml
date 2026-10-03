@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     image: setupninja-demo:local
     container_name: setupninja-demo
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     init: true
     restart: unless-stopped
     ports:
@@ -15,6 +17,7 @@ services:
       PORT: "4174"
       COOKIE_SECURE: "true"
       SETUPNINJA_DATA_DIR: /var/lib/setupninja
+      SETUPNINJA_LOCAL_LLM_URLS: "http://host.docker.internal:11434/v1,http://host.docker.internal:1234/v1"
     volumes:
       - setupninja_data:/var/lib/setupninja
     read_only: true

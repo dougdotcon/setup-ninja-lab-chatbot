@@ -2,6 +2,7 @@ import { readFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { CATEGORY_LABELS, CATEGORY_SLUGS, normalizeCatalogPayload } from './domain/catalog.js';
 
 const projectRoot = fileURLToPath(new URL('..', import.meta.url));
 const databaseDir = path.resolve(process.env.SETUPNINJA_DATA_DIR || path.join(projectRoot, 'data'));
@@ -74,78 +75,140 @@ database.exec(`
   CREATE INDEX IF NOT EXISTS idx_rag_runs_session ON rag_runs(session_id, created_at DESC);
 `);
 
-const slugify = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-const reported = JSON.parse(readFileSync(path.join(projectRoot, 'data/scrape-report.json'), 'utf8'));
-const seedProducts = JSON.parse(readFileSync(path.join(projectRoot, 'data/products.json'), 'utf8'));
-const seedCategories = JSON.parse(readFileSync(path.join(projectRoot, 'data/categories.json'), 'utf8'));
-const now = new Date().toISOString();
-
-function seedCatalog() {
-  const existing = Number(database.prepare('SELECT COUNT(*) AS total FROM products').get().total);
-  if (existing > 0) return;
-
-  const insertCategory = database.prepare(
-    'INSERT INTO categories (id, name, slug, parent_id, product_count, source_url) VALUES (?, ?, ?, ?, 0, ?)'
+function ensureColumn(table, column, definition) {
+  const present = database.prepare(`PRAGMA table_info("${table}")`).all().some((item) => item.name === column);
+  if (!present) database.exec(`ALTER TABLE "${table}" ADD COLUMN "${column}" ${definition}`);
+}
+for (const [column, definition] of Object.entries({
+  price_cents: 'INTEGER', stock_quantity: 'INTEGER NOT NULL DEFAULT 0', in_stock: 'INTEGER NOT NULL DEFAULT 1',
+  category_key: 'TEXT', category_name: 'TEXT', attributes_json: "TEXT NOT NULL DEFAULT '{}'",
+  tags_json: "TEXT NOT NULL DEFAULT '[]'", source_kind: "TEXT NOT NULL DEFAULT 'demo'",
+})) ensureColumn('products', column, definition);
+for (const [column, definition] of Object.entries({
+  available_count: 'INTEGER NOT NULL DEFAULT 0', out_of_stock_count: 'INTEGER NOT NULL DEFAULT 0',
+  source_kind: "TEXT NOT NULL DEFAULT 'demo'",
+})) ensureColumn('categories', column, definition);
+database.exec(`
+  CREATE TABLE IF NOT EXISTS catalog_sync_runs (
+    id INTEGER PRIMARY KEY, source TEXT NOT NULL, last_update TEXT NOT NULL, synced_at TEXT NOT NULL,
+    products INTEGER NOT NULL, available INTEGER NOT NULL, unavailable INTEGER NOT NULL, status TEXT NOT NULL,
+    in_stock_listings INTEGER NOT NULL DEFAULT 0, out_of_stock_listings INTEGER NOT NULL DEFAULT 0
   );
-  for (const category of seedCategories) {
-    insertCategory.run(category.id, category.name, category.slug, category.parent_id || null, category.source_url);
-  }
-  const categoryNames = [...new Set(seedProducts.map((item) => item.category))];
+  CREATE TABLE IF NOT EXISTS catalog_compatibility_exceptions (
+    product_id TEXT PRIMARY KEY, motherboard_compatibility_json TEXT NOT NULL, source_last_update TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS pc_builds (
+    id TEXT PRIMARY KEY, session_id TEXT NOT NULL, created_at TEXT NOT NULL, total_price_cents INTEGER NOT NULL,
+    budget_cents INTEGER, purpose TEXT NOT NULL, requirements_json TEXT NOT NULL, parts_json TEXT NOT NULL,
+    compatibility_json TEXT NOT NULL, decision_provider TEXT NOT NULL, decision_model TEXT NOT NULL,
+    decision_confidence REAL, decision_fallback INTEGER NOT NULL, generation_provider TEXT NOT NULL,
+    generation_model TEXT NOT NULL, explanation TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS pc_build_parts (
+    build_id TEXT NOT NULL REFERENCES pc_builds(id) ON DELETE CASCADE, product_id TEXT NOT NULL,
+    category_key TEXT NOT NULL, quantity INTEGER NOT NULL, unit_price_cents INTEGER NOT NULL,
+    PRIMARY KEY(build_id, product_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_pc_builds_session ON pc_builds(session_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_products_availability_category ON products(in_stock, category_key, price_cents);
+`);
+ensureColumn('catalog_sync_runs', 'in_stock_listings', 'INTEGER NOT NULL DEFAULT 0');
+ensureColumn('catalog_sync_runs', 'out_of_stock_listings', 'INTEGER NOT NULL DEFAULT 0');
 
+const catalogSnapshotPath = path.join(projectRoot, 'data/catalog-api.snapshot.json');
+const catalogRun = database.prepare(`INSERT INTO catalog_sync_runs
+  (source, last_update, synced_at, products, available, unavailable, status, in_stock_listings, out_of_stock_listings)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+export function syncOfficialCatalog(payload, { force = false } = {}) {
+  const normalized = normalizeCatalogPayload(payload);
+  const previous = database.prepare('SELECT last_update FROM catalog_sync_runs WHERE source = ? ORDER BY id DESC LIMIT 1').get(normalized.source);
+  const existingOfficial = Number(database.prepare("SELECT COUNT(*) AS count FROM products WHERE source_kind = 'official-monte-seu-pc'").get().count);
+  const legacyProducts = Number(database.prepare("SELECT COUNT(*) AS count FROM products WHERE source_kind <> 'official-monte-seu-pc'").get().count);
+  if (!force && previous?.last_update === normalized.lastUpdate && existingOfficial === normalized.products.length && legacyProducts === 0) {
+    return { ...normalized.counts, lastUpdate: normalized.lastUpdate, unchanged: true };
+  }
+  const now = new Date().toISOString();
+  const insertCategory = database.prepare(`INSERT INTO categories
+    (id, name, slug, parent_id, product_count, source_url, available_count, out_of_stock_count, source_kind)
+    VALUES (?, ?, ?, NULL, 0, ?, 0, 0, 'official-monte-seu-pc')
+    ON CONFLICT(id) DO UPDATE SET name=excluded.name, slug=excluded.slug, source_url=excluded.source_url, source_kind='official-monte-seu-pc'`);
   const insertProduct = database.prepare(`INSERT INTO products
-    (id, name, brand, sku, price_brl, list_price_brl, installment_price_brl, installments,
-     description, image_url, product_url, source_url, availability, scraped_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Consultar disponibilidade na loja', ?)`);
-  const insertProductCategory = database.prepare(
-    'INSERT INTO product_categories (product_id, category_id) VALUES (?, ?)'
-  );
-  const insertSpec = database.prepare(
-    'INSERT INTO product_specs (product_id, spec_key, spec_value, source_url) VALUES (?, ?, ?, ?)'
-  );
+    (id, name, brand, sku, price_brl, list_price_brl, installment_price_brl, installments, description, image_url,
+      product_url, source_url, availability, scraped_at, price_cents, stock_quantity, in_stock, category_key,
+      category_name, attributes_json, tags_json, source_kind)
+    VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'official-monte-seu-pc')`);
+  const insertLink = database.prepare('INSERT INTO product_categories (product_id, category_id) VALUES (?, ?)');
+  const insertSpec = database.prepare('INSERT INTO product_specs (product_id, spec_key, spec_value, source_url) VALUES (?, ?, ?, ?)');
   const insertChunk = database.prepare(`INSERT INTO knowledge_chunks
-    (title, content, category, source_title, source_url, product_id, scraped_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)`);
-  const sourceOrigins = new Map([
-    ['perifericos', 'https://www.setupninja.com.br/perifericos'],
-    ['computadores', 'https://www.setupninja.com.br/computadores'],
-    ['hardware', 'https://www.setupninja.com.br/hardware'],
-  ]);
-
-  for (const product of seedProducts) {
-    const categorySource = ['Headsets', 'Teclados', 'Mouses', 'Caixas de som'].includes(product.category)
-      ? 'perifericos' : 'computadores';
-    const sourceUrl = sourceOrigins.get(categorySource);
-    const productUrl = product.slug === 'computadores' || product.slug === 'perifericos' || product.slug === 'hardware'
-      ? sourceUrl
-      : `https://www.setupninja.com.br/${product.slug}`;
-    const priceText = Number.isFinite(product.price) ? `No Pix: R$ ${product.price.toFixed(2)}` : 'Preço individual não encontrado';
-    const details = Object.entries(product.specs || {}).map(([key, value]) => `${key}: ${value}`).join('\n');
-    insertProduct.run(product.id, product.name, product.brand, null, product.price ?? null,
-      product.list_price ?? null, product.installment_price ?? null, product.installments ?? null,
-      [priceText, details].filter(Boolean).join('. '), product.image || null,
-      productUrl, sourceUrl, now);
-    insertProductCategory.run(product.id, slugify(product.category));
-    for (const [key, value] of Object.entries(product.specs || {})) {
-      insertSpec.run(product.id, key, value, productUrl);
+    (title, content, category, source_title, source_url, product_id, scraped_at) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  database.exec('BEGIN IMMEDIATE');
+  try {
+    database.prepare("DELETE FROM knowledge_chunks WHERE product_id IN (SELECT id FROM products WHERE source_kind <> 'official-monte-seu-pc')").run();
+    database.prepare("DELETE FROM products WHERE source_kind <> 'official-monte-seu-pc'").run();
+    database.prepare("DELETE FROM product_categories WHERE category_id IN (SELECT id FROM categories WHERE source_kind <> 'official-monte-seu-pc')").run();
+    database.prepare("UPDATE categories SET parent_id=NULL WHERE parent_id IN (SELECT id FROM categories WHERE source_kind <> 'official-monte-seu-pc')").run();
+    database.prepare("UPDATE categories SET parent_id=NULL WHERE source_kind <> 'official-monte-seu-pc'").run();
+    database.prepare("DELETE FROM categories WHERE source_kind <> 'official-monte-seu-pc'").run();
+    database.prepare("DELETE FROM scrape_runs WHERE status <> 'oficial'").run();
+    database.prepare("DELETE FROM knowledge_chunks WHERE product_id IN (SELECT id FROM products WHERE source_kind = 'official-monte-seu-pc')").run();
+    database.prepare("DELETE FROM products WHERE source_kind = 'official-monte-seu-pc'").run();
+    database.prepare("DELETE FROM categories WHERE source_kind = 'official-monte-seu-pc' AND id NOT IN (" + normalized.categories.map(() => '?').join(',') + ')').run(...normalized.categories.map((item) => item.id));
+    database.prepare("DELETE FROM catalog_compatibility_exceptions WHERE 1=1").run();
+    for (const category of normalized.categories) insertCategory.run(category.id, category.name, category.slug, category.sourceUrl);
+    for (const product of normalized.products) {
+      const categoryName = product.categoryKeys.map((key) => CATEGORY_LABELS[key]).join(' · ');
+      const attributes = JSON.stringify(product.attributes);
+      const tags = JSON.stringify(product.tags);
+      const description = [product.name, product.sku && `SKU ${product.sku}`, categoryName,
+        `Preço do catálogo: R$ ${(product.priceCents / 100).toFixed(2)}`,
+        product.inStock ? `Estoque informado: ${product.stockQuantity}` : 'Sem estoque no snapshot consultado',
+        ...product.tags.slice(0, 16)].filter(Boolean).join('. ');
+      insertProduct.run(product.id, product.name, product.brand, product.sku, product.priceCents / 100,
+        description, product.imageUrl, product.productUrl || product.sourceUrl, product.sourceUrl,
+        product.inStock ? `Em estoque (${product.stockQuantity})` : 'Sem estoque no snapshot', now,
+        product.priceCents, product.stockQuantity, product.inStock ? 1 : 0,
+        product.categoryKeys[0], categoryName, attributes, tags);
+      for (const categoryId of new Set(product.categoryKeys.map((key) => normalized.categories.find((category) => category.key === key)?.id).filter(Boolean))) {
+        insertLink.run(product.id, categoryId);
+      }
+      for (const [key, value] of Object.entries(product.attributes)) {
+        if (['id', 'name', 'image', 'tags', 'stock'].includes(key) || value == null) continue;
+        insertSpec.run(product.id, key, Array.isArray(value) || typeof value === 'object' ? JSON.stringify(value) : String(value), product.productUrl || product.sourceUrl);
+      }
+      insertChunk.run(product.name, description, categoryName, 'Catálogo oficial — ' + categoryName,
+        product.productUrl || product.sourceUrl, product.id, now);
     }
-    const answer = [product.name, product.category, product.brand, priceText, details]
-      .filter(Boolean).join('. ');
-    insertChunk.run(product.name, answer, product.category, `Setup Ninja — ${product.category}`,
-      productUrl, product.id, now);
+    for (const exception of normalized.exceptions) {
+      if (!exception || exception.id == null || !Array.isArray(exception.moboCompatibility)) continue;
+      database.prepare(`INSERT INTO catalog_compatibility_exceptions
+        (product_id, motherboard_compatibility_json, source_last_update) VALUES (?, ?, ?)`)
+        .run(String(exception.id), JSON.stringify(exception.moboCompatibility), normalized.lastUpdate);
+    }
+    database.prepare(`UPDATE categories SET product_count = (
+      SELECT COUNT(DISTINCT pc.product_id) FROM product_categories pc WHERE pc.category_id = categories.id
+    ), available_count = (
+      SELECT COUNT(DISTINCT pc.product_id) FROM product_categories pc JOIN products p ON p.id=pc.product_id
+      WHERE pc.category_id = categories.id AND p.in_stock=1
+    ), out_of_stock_count = (
+      SELECT COUNT(DISTINCT pc.product_id) FROM product_categories pc JOIN products p ON p.id=pc.product_id
+      WHERE pc.category_id = categories.id AND p.in_stock=0
+    )`).run();
+    catalogRun.run(normalized.source, normalized.lastUpdate, now, normalized.products.length,
+      normalized.counts.available, normalized.counts.unavailable, 'ok', normalized.counts.inStockCategoryListings,
+      normalized.counts.outOfStockCategoryListings);
+    database.prepare(`INSERT INTO scrape_runs (started_at, finished_at, source_url, product_count, categories_found, status, extraction_note)
+      VALUES (?, ?, ?, ?, ?, 'oficial', ?)`).run(now, now, normalized.source, normalized.products.length, normalized.categories.length,
+      `API oficial: ${normalized.counts.available} em estoque, ${normalized.counts.unavailable} indisponíveis; duplicatas consolidadas por ID.`);
+    database.exec('COMMIT');
+  } catch (error) {
+    database.exec('ROLLBACK');
+    throw error;
   }
-
-  database.prepare(`UPDATE categories SET product_count = (
-    SELECT COUNT(*) FROM product_categories pc WHERE pc.category_id = categories.id
-  )`).run();
-  database.prepare(`INSERT INTO scrape_runs
-    (started_at, finished_at, source_url, product_count, categories_found, status, extraction_note)
-    VALUES (?, ?, ?, ?, ?, 'parcial', ?)`)
-    .run('2026-10-02T00:00:00.000Z', now, reported.store, seedProducts.length, categoryNames.length,
-      'Amostra fiel de paginas publicamente indexadas. Categorias sem pagina de produto acessivel ficam documentadas no relatorio; nenhum preco estimado foi adicionado.');
+  return { ...normalized.counts, lastUpdate: normalized.lastUpdate, unchanged: false };
 }
 
-seedCatalog();
+const bundledCatalog = JSON.parse(readFileSync(catalogSnapshotPath, 'utf8'));
+syncOfficialCatalog(bundledCatalog);
 
 // Operador público pode inspecionar somente catálogo/coleta; históricos são isolados por sessão.
 export const allowedTables = [
@@ -190,7 +253,7 @@ const searchSql = database.prepare(`SELECT k.id, k.title, k.content, k.category,
     p.price_brl
   FROM knowledge_fts JOIN knowledge_chunks k ON k.id = knowledge_fts.rowid
   LEFT JOIN products p ON p.id = k.product_id
-  WHERE knowledge_fts MATCH ?
+  WHERE knowledge_fts MATCH ? AND (p.id IS NULL OR p.in_stock = 1)
   ORDER BY rank ASC LIMIT ?`);
 
 const synonyms = new Map([
@@ -291,6 +354,7 @@ export function clearSession(sessionId) {
 export function getCatalog(filters = {}) {
   const conditions = [];
   const values = [];
+  conditions.push("p.in_stock = 1 AND p.source_kind = 'official-monte-seu-pc'");
   if (filters.category && filters.category !== 'todos') {
     conditions.push('(c.slug = ? OR c.name = ?)');
     values.push(filters.category, filters.category);
@@ -305,28 +369,85 @@ export function getCatalog(filters = {}) {
     : filters.sort === 'price-desc' ? 'ORDER BY p.price_brl IS NULL, p.price_brl DESC'
       : 'ORDER BY p.price_brl IS NULL, p.price_brl ASC, p.name COLLATE NOCASE';
   const limit = Math.min(Math.max(Number.parseInt(filters.limit || '60', 10) || 60, 1), 120);
-  const rows = database.prepare(`SELECT p.*, c.name AS category
+  const rows = database.prepare(`SELECT p.*, MIN(c.name) AS category
     FROM products p JOIN product_categories pc ON pc.product_id = p.id
     JOIN categories c ON c.id = pc.category_id
-    ${search} ${order} LIMIT ?`).all(...values, limit);
-  const count = database.prepare(`SELECT COUNT(*) AS total
+    ${search} GROUP BY p.id ${order} LIMIT ?`).all(...values, limit);
+  const count = database.prepare(`SELECT COUNT(DISTINCT p.id) AS total
     FROM products p JOIN product_categories pc ON pc.product_id = p.id
     JOIN categories c ON c.id = pc.category_id ${search}`).get(...values);
   return { rows, total: Number(count.total), categories: getCategories() };
 }
 
+export function getOfficialBuildData() {
+  const productRows = database.prepare(`SELECT p.*, c.slug AS category_slug FROM products p
+    JOIN product_categories pc ON pc.product_id=p.id JOIN categories c ON c.id=pc.category_id
+    WHERE p.source_kind='official-monte-seu-pc' AND p.in_stock=1`).all();
+  const byId = new Map();
+  const keyForSlug = Object.fromEntries(Object.entries(CATEGORY_SLUGS).map(([key, slug]) => [slug, key]));
+  for (const row of productRows) {
+    const product = byId.get(row.id) || { id: row.id, name: row.name, brand: row.brand, sku: row.sku,
+      priceCents: row.price_cents, imageUrl: row.image_url, productUrl: row.product_url, sourceUrl: row.source_url,
+      inStock: Boolean(row.in_stock), stockQuantity: row.stock_quantity, attributes: JSON.parse(row.attributes_json || '{}'),
+      tags: JSON.parse(row.tags_json || '[]'), categoryKeys: [] };
+    const key = keyForSlug[row.category_slug];
+    if (key && !product.categoryKeys.includes(key)) product.categoryKeys.push(key);
+    byId.set(row.id, product);
+  }
+  const exceptions = database.prepare('SELECT product_id, motherboard_compatibility_json FROM catalog_compatibility_exceptions').all()
+    .map((row) => ({ id: row.product_id, moboCompatibility: JSON.parse(row.motherboard_compatibility_json) }));
+  return { products: [...byId.values()], exceptions };
+}
+
+export function saveBuild({ id, sessionId, candidate, budgetCents, purpose, requirements, decision, generation, explanation }) {
+  const createdAt = new Date().toISOString();
+  const insert = database.prepare(`INSERT INTO pc_builds
+    (id, session_id, created_at, total_price_cents, budget_cents, purpose, requirements_json, parts_json,
+     compatibility_json, decision_provider, decision_model, decision_confidence, decision_fallback,
+     generation_provider, generation_model, explanation)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const insertPart = database.prepare(`INSERT INTO pc_build_parts (build_id, product_id, category_key, quantity, unit_price_cents)
+    VALUES (?, ?, ?, ?, ?)`);
+  database.exec('BEGIN IMMEDIATE');
+  try {
+    insert.run(id, sessionId, createdAt, candidate.totalPriceCents, budgetCents ?? null, purpose,
+      JSON.stringify(requirements), JSON.stringify(candidate.parts), JSON.stringify(candidate.compatibility),
+      decision.provider, decision.model, decision.confidence ?? null, decision.fallback ? 1 : 0,
+      generation.provider, generation.model, explanation);
+    for (const value of Object.values(candidate.parts)) for (const part of Array.isArray(value) ? value : value ? [value] : []) {
+      insertPart.run(id, String(part.id), part.categoryKeys?.[0] || part.category, Number(part.quantity || 1), Number(part.priceCents));
+    }
+    database.exec('COMMIT');
+  } catch (error) { database.exec('ROLLBACK'); throw error; }
+  return { id, createdAt };
+}
+
+export function getSessionBuilds(sessionId, limit = 30) {
+  return database.prepare(`SELECT id, created_at, total_price_cents, budget_cents, purpose,
+    requirements_json, parts_json, compatibility_json, decision_provider, decision_model,
+    decision_confidence, decision_fallback, generation_provider, generation_model, explanation
+    FROM pc_builds WHERE session_id=? ORDER BY created_at DESC LIMIT ?`).all(sessionId, limit).map((row) => ({
+      ...row, requirements: JSON.parse(row.requirements_json), parts: JSON.parse(row.parts_json),
+      compatibility: JSON.parse(row.compatibility_json), requirements_json: undefined, parts_json: undefined,
+      compatibility_json: undefined, decision_fallback: Boolean(row.decision_fallback),
+    }));
+}
+
 export function getCategories() {
-  return database.prepare('SELECT id, name, slug, parent_id, product_count AS count FROM categories ORDER BY name').all();
+  return database.prepare("SELECT id, name, slug, parent_id, product_count AS count, available_count AS availableCount, out_of_stock_count AS outOfStockCount FROM categories WHERE source_kind='official-monte-seu-pc' ORDER BY name").all();
 }
 
 export function getDatabaseStats() {
-  const report = JSON.parse(readFileSync(path.join(projectRoot, 'data/scrape-report.json'), 'utf8'));
+  const latestOfficialSync = database.prepare("SELECT last_update, synced_at, products, available, unavailable, in_stock_listings AS inStockListings, out_of_stock_listings AS outOfStockListings FROM catalog_sync_runs WHERE source='official-monte-seu-pc' ORDER BY id DESC LIMIT 1").get() || null;
   return {
-    products: Number(database.prepare('SELECT COUNT(*) AS total FROM products').get().total),
+    products: Number(database.prepare("SELECT COUNT(*) AS total FROM products WHERE source_kind='official-monte-seu-pc'").get().total),
+    availableProducts: Number(database.prepare("SELECT COUNT(*) AS total FROM products WHERE source_kind='official-monte-seu-pc' AND in_stock=1").get().total),
+    unavailableProducts: Number(database.prepare("SELECT COUNT(*) AS total FROM products WHERE source_kind='official-monte-seu-pc' AND in_stock=0").get().total),
+    latestOfficialSync,
     categories: getCategories(),
     chunks: Number(database.prepare('SELECT COUNT(*) AS total FROM knowledge_chunks').get().total),
     databaseFile: 'data/setupninja.sqlite',
-    collectionDate: report.collected_on,
+    collectionDate: latestOfficialSync?.synced_at?.slice(0, 10) || latestOfficialSync?.last_update?.slice(0, 10) || new Date().toISOString().slice(0, 10),
     method: 'SQLite FTS5 · BM25 · remove_diacritics 2',
   };
 }
@@ -334,5 +455,3 @@ export function getDatabaseStats() {
 export function purgeExpiredSessions() {
   database.prepare('DELETE FROM chat_sessions WHERE expires_at <= ?').run(new Date().toISOString());
 }
-
-export { reported as scrapeReport };

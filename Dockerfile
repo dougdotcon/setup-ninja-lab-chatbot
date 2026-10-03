@@ -11,7 +11,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force && mkdir -p /var/lib/setupninja && chown node:node /var/lib/setupninja
 COPY --from=build /app/server ./server
-COPY --from=build /app/data/products.json /app/data/scrape-report.json /app/data/categories.json ./data/
+COPY --from=build /app/data/catalog-api.snapshot.json ./data/
 COPY --from=build /app/dist ./dist
 USER node
 EXPOSE 4174
