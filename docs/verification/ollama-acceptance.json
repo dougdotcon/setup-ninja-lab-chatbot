@@ -1,0 +1,742 @@
+{
+  "startedAt": "2026-10-03T19:59:47.133Z",
+  "appUrl": "https://setupninja.douvras.com",
+  "provider": "ollama",
+  "model": "setupninja-validation",
+  "cases": [
+    {
+      "name": "gamer-5000",
+      "passed": true,
+      "totalPriceCents": 423520,
+      "items": [
+        {
+          "id": "26078962",
+          "category": "Processador",
+          "name": "Processador AMD Ryzen 5 5500, 6-Cores, 12-Threads, 3.6GHz (4.2GHz Turbo), 19MB, AM4, BOX, 100-100000457BOX",
+          "quantity": 1,
+          "unitPriceCents": 62352,
+          "totalPriceCents": 62352,
+          "stockQuantity": 50,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "29971297",
+          "category": "Placa-mãe",
+          "name": "Placa Mãe Duex DXMBA320G, Chipset A320, DDR4, AMD AM4, M-ATX, OEM, DXMBA320G",
+          "quantity": 1,
+          "unitPriceCents": 37646,
+          "totalPriceCents": 37646,
+          "stockQuantity": 10,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "26461404",
+          "category": "Memória",
+          "name": "Memória Clanm, 8GB (1x8GB), DDR4, 2666MHz, C19, Preto, CLANM8GB2666BLK",
+          "quantity": 2,
+          "unitPriceCents": 37646,
+          "totalPriceCents": 75292,
+          "stockQuantity": 179,
+          "url": "https://www.setupninja.com.br/memoria-clanm-8gb-1x8gb-ddr4-2666mhz-c19-preto-clanm8gb2666blk",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "28461952",
+          "category": "Placa de vídeo",
+          "name": "Placa de Vídeo Zotac GeForce RTX 3050 Twin Edge OC, 6GB, GDDR6, 96-bit, ZT-A30510H-10L",
+          "quantity": 1,
+          "unitPriceCents": 164705,
+          "totalPriceCents": 164705,
+          "stockQuantity": 13,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "30485486",
+          "category": "Fonte",
+          "name": "Fonte Bluecase BLU500-PFCPS2W, 500W, PFC Ativo, ATX PS/2, Branco, BLU500-PFCPS2W",
+          "quantity": 1,
+          "unitPriceCents": 18822,
+          "totalPriceCents": 18822,
+          "stockQuantity": 56,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "29791657",
+          "category": "Gabinete",
+          "name": "Gabinete Gamer Clanm Guiru, Mini-Tower, Aquário, Lateral de Vidro, Preto, Guiru",
+          "quantity": 1,
+          "unitPriceCents": 14116,
+          "totalPriceCents": 14116,
+          "stockQuantity": 9,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "29558404",
+          "category": "Armazenamento",
+          "name": "SSD Goldenfir T650, 480GB, 2.5, Sata III 6GB/sN, Leitura 500MB/s, Gravacao 450MB/s, SSDGOLDENFIR480GB",
+          "quantity": 1,
+          "unitPriceCents": 50587,
+          "totalPriceCents": 50587,
+          "stockQuantity": 1,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        }
+      ],
+      "interpretation": {
+        "provider": "ollama",
+        "model": "setupninja-validation",
+        "called": true,
+        "ignoredPreferences": [
+          "preferredCpu"
+        ]
+      },
+      "generation": {
+        "provider": "ollama",
+        "model": "setupninja-validation",
+        "called": true,
+        "fallback": false,
+        "inputTokens": 85,
+        "outputTokens": 8
+      },
+      "telemetry": {
+        "durationMs": 27758,
+        "budgetCents": 500000,
+        "referenceBudget": false,
+        "actualTotalCents": 423520,
+        "insideBudget": true,
+        "sources": "official-monte-seu-pc",
+        "modelWasActuallyCalled": true
+      },
+      "explanation": "NinjaRUDEUS montou uma sugestão com itens do catálogo oficial.\n\nProcessador AMD Ryzen 5 5500, 6-Cores, 12-Threads, 3.6GHz (4.2GHz Turbo), 19MB, AM4, BOX, 100-100000457BOX — R$ 623,52\nPlaca Mãe Duex DXMBA320G, Chipset A320, DDR4, AMD AM4, M-ATX, OEM, DXMBA320G — R$ 376,46\n2× Memória Clanm, 8GB (1x8GB), DDR4, 2666MHz, C19, Preto, CLANM8GB2666BLK — R$ 752,92\nPlaca de Vídeo Zotac GeForce RTX 3050 Twin Edge OC, 6GB, GDDR6, 96-bit, ZT-A30510H-10L — R$ 1.647,05\nFonte Bluecase BLU500-PFCPS2W, 500W, PFC Ativo, ATX PS/2, Branco, BLU500-PFCPS2W — R$ 188,22\nGabinete Gamer Clanm Guiru, Mini-Tower, Aquário, Lateral de Vidro, Preto, Guiru — R$ 141,16\nSSD Goldenfir T650, 480GB, 2.5, Sata III 6GB/sN, Leitura 500MB/s, Gravacao 450MB/s, SSDGOLDENFIR480GB — R$ 505,87\n\nTotal do catálogo: R$ 4.235,20 (limite R$ 5.000,00).\n\nO total está dentro do limite informado.\n\nConfira antes da compra: Potência da fonte, Formato da placa-mãe e do gabinete, Suporte da BIOS ao processador, Interface do armazenamento e da placa-mãe. Dados não publicados não são confirmação de encaixe.\n\nCompatibilidade: Pendente de conferência."
+    },
+    {
+      "name": "sem-intel-1440p",
+      "passed": true,
+      "totalPriceCents": 676460,
+      "items": [
+        {
+          "id": "28761764",
+          "category": "Processador",
+          "name": "Processador AMD Ryzen 5 5600XT, 6 Cores, 12 Threads, 3.7GHz (4.7GHz Turbo), Cache 35MB, AM4, BOX, 100-000001585BOX",
+          "quantity": 1,
+          "unitPriceCents": 178822,
+          "totalPriceCents": 178822,
+          "stockQuantity": 30,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "29971297",
+          "category": "Placa-mãe",
+          "name": "Placa Mãe Duex DXMBA320G, Chipset A320, DDR4, AMD AM4, M-ATX, OEM, DXMBA320G",
+          "quantity": 1,
+          "unitPriceCents": 37646,
+          "totalPriceCents": 37646,
+          "stockQuantity": 10,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "26461404",
+          "category": "Memória",
+          "name": "Memória Clanm, 8GB (1x8GB), DDR4, 2666MHz, C19, Preto, CLANM8GB2666BLK",
+          "quantity": 2,
+          "unitPriceCents": 37646,
+          "totalPriceCents": 75292,
+          "stockQuantity": 179,
+          "url": "https://www.setupninja.com.br/memoria-clanm-8gb-1x8gb-ddr4-2666mhz-c19-preto-clanm8gb2666blk",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "30846571",
+          "category": "Placa de vídeo",
+          "name": "Placa de Vídeo Gigabyte GeForce RTX 5060 EAGLE OC, 8GB, GDDR7, 128-bit, GV-N5060EAGLE OC-8GD",
+          "quantity": 1,
+          "unitPriceCents": 321175,
+          "totalPriceCents": 321175,
+          "stockQuantity": 16,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "30355948",
+          "category": "Fonte",
+          "name": "Fonte Duex DX 600FSE+, 600W, PFC Ativo, 80 Plus Bronze, ATX, Branco, 600FSE+",
+          "quantity": 1,
+          "unitPriceCents": 25881,
+          "totalPriceCents": 25881,
+          "stockQuantity": 110,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "29791657",
+          "category": "Gabinete",
+          "name": "Gabinete Gamer Clanm Guiru, Mini-Tower, Aquário, Lateral de Vidro, Preto, Guiru",
+          "quantity": 1,
+          "unitPriceCents": 14116,
+          "totalPriceCents": 14116,
+          "stockQuantity": 9,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "30950207",
+          "category": "Armazenamento",
+          "name": "SSD Rise Mode Gamer Line, 120GB, 2.5\", SATA III 6 Gb/s, Leitura 530MB/s, Gravação 520MB/s, RM-SSD-120",
+          "quantity": 1,
+          "unitPriceCents": 23528,
+          "totalPriceCents": 23528,
+          "stockQuantity": 2,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        }
+      ],
+      "interpretation": {
+        "provider": "ollama",
+        "model": "setupninja-validation",
+        "called": true,
+        "ignoredPreferences": [
+          "preferredCpu"
+        ]
+      },
+      "generation": {
+        "provider": "ollama",
+        "model": "setupninja-validation",
+        "called": true,
+        "fallback": false,
+        "inputTokens": 85,
+        "outputTokens": 12
+      },
+      "telemetry": {
+        "durationMs": 17389,
+        "budgetCents": 700000,
+        "referenceBudget": false,
+        "actualTotalCents": 676460,
+        "insideBudget": true,
+        "sources": "official-monte-seu-pc",
+        "modelWasActuallyCalled": true
+      },
+      "explanation": "NinjaRUDEUS montou uma sugestão com itens do catálogo oficial.\n\nProcessador AMD Ryzen 5 5600XT, 6 Cores, 12 Threads, 3.7GHz (4.7GHz Turbo), Cache 35MB, AM4, BOX, 100-000001585BOX — R$ 1.788,22\nPlaca Mãe Duex DXMBA320G, Chipset A320, DDR4, AMD AM4, M-ATX, OEM, DXMBA320G — R$ 376,46\n2× Memória Clanm, 8GB (1x8GB), DDR4, 2666MHz, C19, Preto, CLANM8GB2666BLK — R$ 752,92\nPlaca de Vídeo Gigabyte GeForce RTX 5060 EAGLE OC, 8GB, GDDR7, 128-bit, GV-N5060EAGLE OC-8GD — R$ 3.211,75\nFonte Duex DX 600FSE+, 600W, PFC Ativo, 80 Plus Bronze, ATX, Branco, 600FSE+ — R$ 258,81\nGabinete Gamer Clanm Guiru, Mini-Tower, Aquário, Lateral de Vidro, Preto, Guiru — R$ 141,16\nSSD Rise Mode Gamer Line, 120GB, 2.5\", SATA III 6 Gb/s, Leitura 530MB/s, Gravação 520MB/s, RM-SSD-120 — R$ 235,28\n\nTotal do catálogo: R$ 6.764,60 (limite R$ 7.000,00).\n\nO total está dentro do limite informado. A seleção prioriza uma montagem voltada a jogos, conforme o pedido.\n\nConfira antes da compra: Potência da fonte, Formato da placa-mãe e do gabinete, Suporte da BIOS ao processador, Interface do armazenamento e da placa-mãe. Dados não publicados não são confirmação de encaixe.\n\nCompatibilidade: Pendente de conferência."
+    },
+    {
+      "name": "prioridade-gpu",
+      "passed": true,
+      "totalPriceCents": 689948,
+      "items": [
+        {
+          "id": "30853799",
+          "category": "Processador",
+          "name": "Processador Intel Core i5-12400, 6-Core, 12-Thread, 2.5GHz (4.4GHz Turbo), Cache 18MB, LGA 1700, TRAY, CM8071504650608",
+          "quantity": 1,
+          "unitPriceCents": 176469,
+          "totalPriceCents": 176469,
+          "stockQuantity": 14,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "29791653",
+          "category": "Placa-mãe",
+          "name": "Placa Mãe Biostar H610MHC 2.0, DDR4, Socket Intel LGA1700, mATX, Chipset Intel H610, H610MHC 2.0",
+          "quantity": 1,
+          "unitPriceCents": 50587,
+          "totalPriceCents": 50587,
+          "stockQuantity": 19,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "26461404",
+          "category": "Memória",
+          "name": "Memória Clanm, 8GB (1x8GB), DDR4, 2666MHz, C19, Preto, CLANM8GB2666BLK",
+          "quantity": 2,
+          "unitPriceCents": 37646,
+          "totalPriceCents": 75292,
+          "stockQuantity": 179,
+          "url": "https://www.setupninja.com.br/memoria-clanm-8gb-1x8gb-ddr4-2666mhz-c19-preto-clanm8gb2666blk",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "30846571",
+          "category": "Placa de vídeo",
+          "name": "Placa de Vídeo Gigabyte GeForce RTX 5060 EAGLE OC, 8GB, GDDR7, 128-bit, GV-N5060EAGLE OC-8GD",
+          "quantity": 1,
+          "unitPriceCents": 321175,
+          "totalPriceCents": 321175,
+          "stockQuantity": 16,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "30355948",
+          "category": "Fonte",
+          "name": "Fonte Duex DX 600FSE+, 600W, PFC Ativo, 80 Plus Bronze, ATX, Branco, 600FSE+",
+          "quantity": 1,
+          "unitPriceCents": 25881,
+          "totalPriceCents": 25881,
+          "stockQuantity": 110,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "29791657",
+          "category": "Gabinete",
+          "name": "Gabinete Gamer Clanm Guiru, Mini-Tower, Aquário, Lateral de Vidro, Preto, Guiru",
+          "quantity": 1,
+          "unitPriceCents": 14116,
+          "totalPriceCents": 14116,
+          "stockQuantity": 9,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "30950207",
+          "category": "Armazenamento",
+          "name": "SSD Rise Mode Gamer Line, 120GB, 2.5\", SATA III 6 Gb/s, Leitura 530MB/s, Gravação 520MB/s, RM-SSD-120",
+          "quantity": 1,
+          "unitPriceCents": 23528,
+          "totalPriceCents": 23528,
+          "stockQuantity": 2,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "29523011",
+          "category": "Cooler",
+          "name": "Cooler TGT F22, 92mm, Intel/AMD, Preto, TGT-F22-01",
+          "quantity": 1,
+          "unitPriceCents": 2900,
+          "totalPriceCents": 2900,
+          "stockQuantity": 62,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        }
+      ],
+      "interpretation": {
+        "provider": "ollama",
+        "model": "setupninja-validation",
+        "called": true,
+        "ignoredPreferences": [
+          "preferredCpu"
+        ]
+      },
+      "generation": {
+        "provider": "ollama",
+        "model": "setupninja-validation",
+        "called": true,
+        "fallback": false,
+        "inputTokens": 89,
+        "outputTokens": 8
+      },
+      "telemetry": {
+        "durationMs": 15097,
+        "budgetCents": 700000,
+        "referenceBudget": false,
+        "actualTotalCents": 689948,
+        "insideBudget": true,
+        "sources": "official-monte-seu-pc",
+        "modelWasActuallyCalled": true
+      },
+      "explanation": "NinjaRUDEUS montou uma sugestão com itens do catálogo oficial.\n\nProcessador Intel Core i5-12400, 6-Core, 12-Thread, 2.5GHz (4.4GHz Turbo), Cache 18MB, LGA 1700, TRAY, CM8071504650608 — R$ 1.764,69\nPlaca Mãe Biostar H610MHC 2.0, DDR4, Socket Intel LGA1700, mATX, Chipset Intel H610, H610MHC 2.0 — R$ 505,87\n2× Memória Clanm, 8GB (1x8GB), DDR4, 2666MHz, C19, Preto, CLANM8GB2666BLK — R$ 752,92\nPlaca de Vídeo Gigabyte GeForce RTX 5060 EAGLE OC, 8GB, GDDR7, 128-bit, GV-N5060EAGLE OC-8GD — R$ 3.211,75\nFonte Duex DX 600FSE+, 600W, PFC Ativo, 80 Plus Bronze, ATX, Branco, 600FSE+ — R$ 258,81\nGabinete Gamer Clanm Guiru, Mini-Tower, Aquário, Lateral de Vidro, Preto, Guiru — R$ 141,16\nSSD Rise Mode Gamer Line, 120GB, 2.5\", SATA III 6 Gb/s, Leitura 530MB/s, Gravação 520MB/s, RM-SSD-120 — R$ 235,28\nCooler TGT F22, 92mm, Intel/AMD, Preto, TGT-F22-01 — R$ 29,00\n\nTotal do catálogo: R$ 6.899,48 (limite R$ 7.000,00).\n\nO total está dentro do limite informado.\n\nConfira antes da compra: Potência da fonte, Formato da placa-mãe e do gabinete, Suporte da BIOS ao processador, Interface do armazenamento e da placa-mãe. Dados não publicados não são confirmação de encaixe.\n\nCompatibilidade: Pendente de conferência."
+    },
+    {
+      "name": "ryzen7-edicao-sem-teto",
+      "passed": true,
+      "totalPriceCents": 755703,
+      "items": [
+        {
+          "id": "29791642",
+          "category": "Processador",
+          "name": "Processador AMD Ryzen 7 5700X, 8 Cores, 16 Threads, 3.4GHz (4.6GHz Turbo), Cache 36MB, AM4, BOX, 100-100000926WOF",
+          "quantity": 1,
+          "unitPriceCents": 152940,
+          "totalPriceCents": 152940,
+          "stockQuantity": 3,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "25588481",
+          "category": "Placa-mãe",
+          "name": "Placa Mãe Biostar A520MHP, DDR4, Socket AMD AM4, mATX, Chipset A520M, A520MHP",
+          "quantity": 1,
+          "unitPriceCents": 46941,
+          "totalPriceCents": 46941,
+          "stockQuantity": 1,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "26461403",
+          "category": "Memória",
+          "name": "Memória Clanm, 16GB (1x16GB), DDR4, 2666MHz, C19, Preto, CLANM16GB2666BLK",
+          "quantity": 2,
+          "unitPriceCents": 76469,
+          "totalPriceCents": 152938,
+          "stockQuantity": 16,
+          "url": "https://www.setupninja.com.br/memoria-clanm-16gb-1x16gb-ddr4-2666mhz-c19-preto-clanm16gb2666blk",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "30882846",
+          "category": "Placa de vídeo",
+          "name": "Placa de Vídeo PELADN GeForce Rtx 5060, 8GB, GDDR7, 128-bit, RTX 5060 8GD7 ARMOUR",
+          "quantity": 1,
+          "unitPriceCents": 305881,
+          "totalPriceCents": 305881,
+          "stockQuantity": 203,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "30355948",
+          "category": "Fonte",
+          "name": "Fonte Duex DX 600FSE+, 600W, PFC Ativo, 80 Plus Bronze, ATX, Branco, 600FSE+",
+          "quantity": 1,
+          "unitPriceCents": 25881,
+          "totalPriceCents": 25881,
+          "stockQuantity": 110,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "27434165",
+          "category": "Gabinete",
+          "name": "Gabinete Gamer Clanm Smog, Mid-Tower, Lateral de Vidro, Com 3 Fans, Preto, CLANMSMOG",
+          "quantity": 1,
+          "unitPriceCents": 17635,
+          "totalPriceCents": 17635,
+          "stockQuantity": 81,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "29558404",
+          "category": "Armazenamento",
+          "name": "SSD Goldenfir T650, 480GB, 2.5, Sata III 6GB/sN, Leitura 500MB/s, Gravacao 450MB/s, SSDGOLDENFIR480GB",
+          "quantity": 1,
+          "unitPriceCents": 50587,
+          "totalPriceCents": 50587,
+          "stockQuantity": 1,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "29523011",
+          "category": "Cooler",
+          "name": "Cooler TGT F22, 92mm, Intel/AMD, Preto, TGT-F22-01",
+          "quantity": 1,
+          "unitPriceCents": 2900,
+          "totalPriceCents": 2900,
+          "stockQuantity": 62,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        }
+      ],
+      "interpretation": {
+        "provider": "ollama",
+        "model": "setupninja-validation",
+        "called": true
+      },
+      "generation": {
+        "provider": "ollama",
+        "model": "setupninja-validation",
+        "called": true,
+        "fallback": false,
+        "inputTokens": 93,
+        "outputTokens": 16
+      },
+      "telemetry": {
+        "durationMs": 15414,
+        "budgetCents": 800000,
+        "referenceBudget": true,
+        "actualTotalCents": 755703,
+        "insideBudget": true,
+        "sources": "official-monte-seu-pc",
+        "modelWasActuallyCalled": true
+      },
+      "explanation": "Você não informou um teto. Usei R$ 8.000,00 apenas como referência inicial; posso ajustar ao orçamento que preferir.\n\nNinjaRUDEUS montou uma sugestão com itens do catálogo oficial.\n\nProcessador AMD Ryzen 7 5700X, 8 Cores, 16 Threads, 3.4GHz (4.6GHz Turbo), Cache 36MB, AM4, BOX, 100-100000926WOF — R$ 1.529,40\nPlaca Mãe Biostar A520MHP, DDR4, Socket AMD AM4, mATX, Chipset A520M, A520MHP — R$ 469,41\n2× Memória Clanm, 16GB (1x16GB), DDR4, 2666MHz, C19, Preto, CLANM16GB2666BLK — R$ 1.529,38\nPlaca de Vídeo PELADN GeForce Rtx 5060, 8GB, GDDR7, 128-bit, RTX 5060 8GD7 ARMOUR — R$ 3.058,81\nFonte Duex DX 600FSE+, 600W, PFC Ativo, 80 Plus Bronze, ATX, Branco, 600FSE+ — R$ 258,81\nGabinete Gamer Clanm Smog, Mid-Tower, Lateral de Vidro, Com 3 Fans, Preto, CLANMSMOG — R$ 176,35\nSSD Goldenfir T650, 480GB, 2.5, Sata III 6GB/sN, Leitura 500MB/s, Gravacao 450MB/s, SSDGOLDENFIR480GB — R$ 505,87\nCooler TGT F22, 92mm, Intel/AMD, Preto, TGT-F22-01 — R$ 29,00\n\nTotal do catálogo: R$ 7.557,03 (limite R$ 8.000,00).\n\nO total está dentro do limite informado. A seleção considera o uso de trabalho informado. O processador corresponde à preferência indicada.\n\nConfira antes da compra: Potência da fonte, Formato da placa-mãe e do gabinete, Suporte da BIOS ao processador, Interface do armazenamento e da placa-mãe. Dados não publicados não são confirmação de encaixe.\n\nCompatibilidade: Pendente de conferência."
+    },
+    {
+      "name": "rtx5070-sem-teto",
+      "passed": true,
+      "totalPriceCents": 1167990,
+      "items": [
+        {
+          "id": "27613463",
+          "category": "Processador",
+          "name": "Processador AMD Ryzen 7 5700, 8-Cores, 16-Threads, 3.7GHz (4.6GHz Turbo), Cache 20MB, AM4, BOX, 100-100000743BOX",
+          "quantity": 1,
+          "unitPriceCents": 234115,
+          "totalPriceCents": 234115,
+          "stockQuantity": 50,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "27573530",
+          "category": "Placa-mãe",
+          "name": "Placa Mãe ASUS Prime B550M-A, DDR4, Socket AMD AM4, mATX, Chipset B550, ASUSPRIMEB550MA",
+          "quantity": 1,
+          "unitPriceCents": 105765,
+          "totalPriceCents": 105765,
+          "stockQuantity": 50,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "26461405",
+          "category": "Memória",
+          "name": "Memória Clanm, 8GB (1x8GB), DDR4, 3200Mhz, C19, Branco, CLANM8GB3200WH",
+          "quantity": 3,
+          "unitPriceCents": 43528,
+          "totalPriceCents": 130584,
+          "stockQuantity": 621,
+          "url": "https://www.setupninja.com.br/memoria-clanm-8gb-1x8gb-ddr4-3200mhz-c19-branco-clanm8gb3200wh",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "30580341",
+          "category": "Placa de vídeo",
+          "name": "Placa de Vídeo INNO3D GeForce RTX 5070 Twin x2, 12GB, GDDR7, 192-bit, N50702-12D7-195064N",
+          "quantity": 1,
+          "unitPriceCents": 599999,
+          "totalPriceCents": 599999,
+          "stockQuantity": 65,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "27382267",
+          "category": "Fonte",
+          "name": "Fonte BRX Gamer Rainbow, 750W, PFC Ativo, 80 Plus Bronze, RGB, Preto, ATX, RB750W",
+          "quantity": 1,
+          "unitPriceCents": 32824,
+          "totalPriceCents": 32824,
+          "stockQuantity": 7,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "29791657",
+          "category": "Gabinete",
+          "name": "Gabinete Gamer Clanm Guiru, Mini-Tower, Aquário, Lateral de Vidro, Preto, Guiru",
+          "quantity": 1,
+          "unitPriceCents": 14116,
+          "totalPriceCents": 14116,
+          "stockQuantity": 9,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "29558404",
+          "category": "Armazenamento",
+          "name": "SSD Goldenfir T650, 480GB, 2.5, Sata III 6GB/sN, Leitura 500MB/s, Gravacao 450MB/s, SSDGOLDENFIR480GB",
+          "quantity": 1,
+          "unitPriceCents": 50587,
+          "totalPriceCents": 50587,
+          "stockQuantity": 1,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        }
+      ],
+      "interpretation": {
+        "provider": "ollama",
+        "model": "setupninja-validation",
+        "called": true,
+        "ignoredPreferences": [
+          "preferredCpu"
+        ]
+      },
+      "generation": {
+        "provider": "ollama",
+        "model": "setupninja-validation",
+        "called": true,
+        "fallback": false,
+        "inputTokens": 93,
+        "outputTokens": 12
+      },
+      "telemetry": {
+        "durationMs": 14217,
+        "budgetCents": 1500000,
+        "referenceBudget": true,
+        "actualTotalCents": 1167990,
+        "insideBudget": true,
+        "sources": "official-monte-seu-pc",
+        "modelWasActuallyCalled": true
+      },
+      "explanation": "Você não informou um teto. Usei R$ 15.000,00 apenas como referência inicial; posso ajustar ao orçamento que preferir.\n\nNinjaRUDEUS montou uma sugestão com itens do catálogo oficial.\n\nProcessador AMD Ryzen 7 5700, 8-Cores, 16-Threads, 3.7GHz (4.6GHz Turbo), Cache 20MB, AM4, BOX, 100-100000743BOX — R$ 2.341,15\nPlaca Mãe ASUS Prime B550M-A, DDR4, Socket AMD AM4, mATX, Chipset B550, ASUSPRIMEB550MA — R$ 1.057,65\n3× Memória Clanm, 8GB (1x8GB), DDR4, 3200Mhz, C19, Branco, CLANM8GB3200WH — R$ 1.305,84\nPlaca de Vídeo INNO3D GeForce RTX 5070 Twin x2, 12GB, GDDR7, 192-bit, N50702-12D7-195064N — R$ 5.999,99\nFonte BRX Gamer Rainbow, 750W, PFC Ativo, 80 Plus Bronze, RGB, Preto, ATX, RB750W — R$ 328,24\nGabinete Gamer Clanm Guiru, Mini-Tower, Aquário, Lateral de Vidro, Preto, Guiru — R$ 141,16\nSSD Goldenfir T650, 480GB, 2.5, Sata III 6GB/sN, Leitura 500MB/s, Gravacao 450MB/s, SSDGOLDENFIR480GB — R$ 505,87\n\nTotal do catálogo: R$ 11.679,90 (limite R$ 15.000,00).\n\nO total está dentro do limite informado. A seleção prioriza uma montagem voltada a jogos, conforme o pedido.\n\nConfira antes da compra: Formato da placa-mãe e do gabinete, Suporte da BIOS ao processador, Interface do armazenamento e da placa-mãe. Dados não publicados não são confirmação de encaixe.\n\nCompatibilidade: Pendente de conferência."
+    },
+    {
+      "name": "refinamento-preserva32",
+      "passed": true,
+      "totalPriceCents": 510461,
+      "items": [
+        {
+          "id": "26078962",
+          "category": "Processador",
+          "name": "Processador AMD Ryzen 5 5500, 6-Cores, 12-Threads, 3.6GHz (4.2GHz Turbo), 19MB, AM4, BOX, 100-100000457BOX",
+          "quantity": 1,
+          "unitPriceCents": 62352,
+          "totalPriceCents": 62352,
+          "stockQuantity": 50,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "25588481",
+          "category": "Placa-mãe",
+          "name": "Placa Mãe Biostar A520MHP, DDR4, Socket AMD AM4, mATX, Chipset A520M, A520MHP",
+          "quantity": 1,
+          "unitPriceCents": 46941,
+          "totalPriceCents": 46941,
+          "stockQuantity": 1,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "26461403",
+          "category": "Memória",
+          "name": "Memória Clanm, 16GB (1x16GB), DDR4, 2666MHz, C19, Preto, CLANM16GB2666BLK",
+          "quantity": 2,
+          "unitPriceCents": 76469,
+          "totalPriceCents": 152938,
+          "stockQuantity": 16,
+          "url": "https://www.setupninja.com.br/memoria-clanm-16gb-1x16gb-ddr4-2666mhz-c19-preto-clanm16gb2666blk",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "28461952",
+          "category": "Placa de vídeo",
+          "name": "Placa de Vídeo Zotac GeForce RTX 3050 Twin Edge OC, 6GB, GDDR6, 96-bit, ZT-A30510H-10L",
+          "quantity": 1,
+          "unitPriceCents": 164705,
+          "totalPriceCents": 164705,
+          "stockQuantity": 13,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "30485486",
+          "category": "Fonte",
+          "name": "Fonte Bluecase BLU500-PFCPS2W, 500W, PFC Ativo, ATX PS/2, Branco, BLU500-PFCPS2W",
+          "quantity": 1,
+          "unitPriceCents": 18822,
+          "totalPriceCents": 18822,
+          "stockQuantity": 56,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "29791657",
+          "category": "Gabinete",
+          "name": "Gabinete Gamer Clanm Guiru, Mini-Tower, Aquário, Lateral de Vidro, Preto, Guiru",
+          "quantity": 1,
+          "unitPriceCents": 14116,
+          "totalPriceCents": 14116,
+          "stockQuantity": 9,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        },
+        {
+          "id": "29558404",
+          "category": "Armazenamento",
+          "name": "SSD Goldenfir T650, 480GB, 2.5, Sata III 6GB/sN, Leitura 500MB/s, Gravacao 450MB/s, SSDGOLDENFIR480GB",
+          "quantity": 1,
+          "unitPriceCents": 50587,
+          "totalPriceCents": 50587,
+          "stockQuantity": 1,
+          "url": "https://monte-seu-pc.setupninja.com.br/produtos",
+          "sourceUrl": "https://monte-seu-pc.setupninja.com.br/produtos"
+        }
+      ],
+      "interpretation": {
+        "provider": "ollama",
+        "model": "setupninja-validation",
+        "called": true,
+        "ignoredPreferences": [
+          "preferredCpu"
+        ]
+      },
+      "generation": {
+        "provider": "ollama",
+        "model": "setupninja-validation",
+        "called": true,
+        "fallback": false,
+        "inputTokens": 89,
+        "outputTokens": 13
+      },
+      "telemetry": {
+        "durationMs": 11195,
+        "budgetCents": 600000,
+        "referenceBudget": false,
+        "actualTotalCents": 510461,
+        "insideBudget": true,
+        "sources": "official-monte-seu-pc",
+        "modelWasActuallyCalled": true
+      },
+      "explanation": "NinjaRUDEUS montou uma sugestão com itens do catálogo oficial.\n\nProcessador AMD Ryzen 5 5500, 6-Cores, 12-Threads, 3.6GHz (4.2GHz Turbo), 19MB, AM4, BOX, 100-100000457BOX — R$ 623,52\nPlaca Mãe Biostar A520MHP, DDR4, Socket AMD AM4, mATX, Chipset A520M, A520MHP — R$ 469,41\n2× Memória Clanm, 16GB (1x16GB), DDR4, 2666MHz, C19, Preto, CLANM16GB2666BLK — R$ 1.529,38\nPlaca de Vídeo Zotac GeForce RTX 3050 Twin Edge OC, 6GB, GDDR6, 96-bit, ZT-A30510H-10L — R$ 1.647,05\nFonte Bluecase BLU500-PFCPS2W, 500W, PFC Ativo, ATX PS/2, Branco, BLU500-PFCPS2W — R$ 188,22\nGabinete Gamer Clanm Guiru, Mini-Tower, Aquário, Lateral de Vidro, Preto, Guiru — R$ 141,16\nSSD Goldenfir T650, 480GB, 2.5, Sata III 6GB/sN, Leitura 500MB/s, Gravacao 450MB/s, SSDGOLDENFIR480GB — R$ 505,87\n\nTotal do catálogo: R$ 5.104,61 (limite R$ 6.000,00).\n\nO total está dentro do limite informado. Alguns encaixes permanecem sem confirmação porque a API não publica todos os dados necessários.\n\nConfira antes da compra: Potência da fonte, Formato da placa-mãe e do gabinete, Suporte da BIOS ao processador, Interface do armazenamento e da placa-mãe. Dados não publicados não são confirmação de encaixe.\n\nCompatibilidade: Pendente de conferência."
+    },
+    {
+      "name": "rtx5070-orcamento-impossivel",
+      "passed": true,
+      "error": "Não encontrei uma montagem completa validada abaixo de R$ 5.000,00 com as peças selecionadas. Tente um orçamento maior ou remova uma preferência."
+    },
+    {
+      "name": "guia-hardware-rag",
+      "passed": true,
+      "answer": "NinjaRUDEUS na bancada. Instalar memória RAM em um desktop:\nDesligue o computador e desconecte o cabo de energia. Antes de tocar nos módulos, descarregue a eletricidade estática tocando em metal aterrado ou use pulseira antiestática. Segure a memória pelas bordas, alinhe o entalhe do módulo com a chave do slot e pressione até as travas se fecharem. Para dois módulos, consulte o manual da placa-mãe para escolher os slots de dual channel. Não force um módulo desalinhado.\n\nSiga também o manual do modelo específico; versões e disposição dos componentes variam. Fonte: Kingston Technology — instalação de memória em desktop.",
+      "citations": [
+        {
+          "id": 1237,
+          "productId": null,
+          "title": "Instalar memória RAM em um desktop",
+          "category": "Guias de hardware",
+          "url": "https://www.kingston.com/en/support/technical/how-to-install-memory-desktop-pc",
+          "rank": -29.010632863690002
+        }
+      ],
+      "telemetry": {
+        "assistant": "NinjaRUDEUS",
+        "model": "setupninja-validation",
+        "mode": "api_openai_compatível",
+        "providerCalled": true,
+        "retrieved": 1,
+        "durationMs": 4002,
+        "inputTokens": 307,
+        "outputTokens": 19,
+        "outcome": "respondido",
+        "database": "SQLite FTS5 · BM25",
+        "chainOfThoughtStored": false
+      }
+    },
+    {
+      "name": "follow-up-fora-escopo",
+      "passed": true,
+      "answer": "Esse assunto não pertence à minha bancada. Atendo tecnologia, hardware e produtos da Setup Ninja. Quer comparar uma peça ou tirar uma dúvida de montagem?",
+      "citations": [],
+      "telemetry": {
+        "assistant": "NinjaRUDEUS",
+        "model": "NinjaRUDEUS demonstrativo local",
+        "mode": "demo_local",
+        "providerCalled": false,
+        "retrieved": 0,
+        "durationMs": 2,
+        "inputTokens": null,
+        "outputTokens": null,
+        "outcome": "fora_escopo",
+        "database": "SQLite FTS5 · BM25",
+        "chainOfThoughtStored": false
+      }
+    }
+  ],
+  "acceptedModelGenerations": 6,
+  "acceptedModelInterpretations": 6,
+  "finishedAt": "2026-10-03T20:02:04.692Z"
+}
