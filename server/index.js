@@ -312,9 +312,16 @@ app.post('/api/build', originGuard, useSession, rateLimit(5), async (req, res) =
       if (!parsedIntent) throw Error('invalid-interpretation-schema');
       modelIntent = parsedIntent;
       interpretation = { provider: language.provider, model: language.model, called: true };
-      if (!requestedVendor && !requirements.preferredVendor && parsedIntent.preferredVendor && !excludedVendors.includes(parsedIntent.preferredVendor)) requirements.preferredVendor = parsedIntent.preferredVendor;
-      if (!processorModel && parsedIntent.preferredCpu) requirements.preferredCpu = parsedIntent.preferredCpu.slice(0, 50);
-      if (!req.body?.memoryGB && !requestIntent.memoryGB && Number.isInteger(parsedIntent.memoryGB)) {
+      const processorMayBeRefined = !previousBuild || refineTargets.has('processor');
+      const cpuPreferenceWasRequested = parsedIntent.preferredCpu
+        && normalizeRequest(request).includes(normalizeRequest(parsedIntent.preferredCpu));
+      if (processorMayBeRefined && !explicitRequiredParts.has('processor')) {
+        if (!requestedVendor && !requirements.preferredVendor && parsedIntent.preferredVendor && !excludedVendors.includes(parsedIntent.preferredVendor)) requirements.preferredVendor = parsedIntent.preferredVendor;
+        if (!processorModel && cpuPreferenceWasRequested) requirements.preferredCpu = parsedIntent.preferredCpu.slice(0, 50);
+      }
+      if (parsedIntent.preferredCpu && !cpuPreferenceWasRequested) interpretation.ignoredPreferences = ['preferredCpu'];
+      const memoryMayBeRefined = !previousBuild || refineTargets.has('memory');
+      if (memoryMayBeRefined && !req.body?.memoryGB && !requestIntent.memoryGB && Number.isInteger(parsedIntent.memoryGB)) {
         requirements.memoryGB = Math.max(requirements.memoryGB, Math.min(128, parsedIntent.memoryGB));
       }
       if (!requestIntent.purpose && !previousBuild && parsedIntent.purpose) requirements.purpose = parsedIntent.purpose;

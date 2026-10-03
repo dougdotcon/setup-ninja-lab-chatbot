@@ -56,7 +56,11 @@ test('literal challenge journeys preserve official stock, constraints and sessio
       if (!body.response_format) content = 'OK';
       else if (mockMode === 'malformed') content = '{json quebrado';
       else if (/Extraia preferências/.test(systemText)) {
-        content = JSON.stringify({ purpose: 'gaming', memoryGB: 16, dedicatedGpu: true, preferredVendor: null, preferredCpu: null });
+        content = JSON.stringify(mockMode === 'refinement-hallucination'
+          ? { purpose: 'gaming', memoryGB: 64, dedicatedGpu: true, preferredVendor: 'intel', preferredCpu: 'Core i7' }
+          : mockMode === 'cpu-hallucination'
+            ? { purpose: 'gaming', memoryGB: 32, dedicatedGpu: true, preferredVendor: null, preferredCpu: 'Ryzen 7' }
+            : { purpose: 'gaming', memoryGB: 16, dedicatedGpu: true, preferredVendor: null, preferredCpu: null });
       } else if (/razões verdadeiras dentre os IDs permitidos/.test(systemText)) {
         const task = JSON.parse(body.messages.at(-1).content);
         content = JSON.stringify({ reasons: mockMode === 'invalid' ? ['invented-performance'] : task.allowedReasons.slice(0, 2) });
@@ -268,6 +272,14 @@ test('literal challenge journeys preserve official stock, constraints and sessio
   assert.equal(providerOffTopic.data.telemetry.outcome, 'fora_escopo');
   assert.equal(providerOffTopic.data.telemetry.providerCalled, false);
 
+  mockMode = 'cpu-hallucination';
+  const cpuSuggestionWithoutAnchor = await build(modelSession, 'Monte um PC gamer Ryzen com 32 GB até R$ 6.000.', { budget: 6000 });
+  mockMode = 'valid';
+  const cpuSuggestionParts = verifyBuild(cpuSuggestionWithoutAnchor, 600_000);
+  assert.doesNotMatch(cpuSuggestionParts.Processador.name, /Ryzen 7/i);
+  assert.equal(cpuSuggestionParts.Memória.quantity * official.get(cpuSuggestionParts.Memória.id).attributes.ramCapacity, 32);
+  assert.deepEqual(cpuSuggestionWithoutAnchor.interpretation.ignoredPreferences, ['preferredCpu']);
+
   const explicitRefinement = await build(modelSession, 'Quero Ryzen 7 com 32 GB para edição de vídeo.', { budget: 8000 });
   const explicitParts = verifyBuild(explicitRefinement, 800_000);
   assert.match(explicitParts.Processador.name, /Ryzen 7/i);
@@ -275,10 +287,14 @@ test('literal challenge journeys preserve official stock, constraints and sessio
   assert.equal(explicitRefinement.telemetry.referenceBudget, false);
   const explicitHistory = (await api(modelSession, '/api/build/history')).data.builds;
   assert.equal(explicitHistory[0].purpose, 'workstation', 'a interpretação LLM não pode sobrepor o propósito explícito');
+  mockMode = 'refinement-hallucination';
   const preservedMemory = await build(modelSession, 'Agora quero GPU NVIDIA.', { previousBuildId: explicitRefinement.buildId });
+  mockMode = 'valid';
   const preservedParts = verifyBuild(preservedMemory, 800_000);
   assert.match(preservedParts['Placa de vídeo'].name, /nvidia|geforce|\b(?:rtx|gtx|gt)\s*\d/i);
-  assert.ok(preservedParts.Memória.quantity * official.get(preservedParts.Memória.id).attributes.ramCapacity >= 32);
+  assert.equal(preservedParts.Processador.id, explicitParts.Processador.id);
+  assert.equal(preservedParts.Memória.quantity * official.get(preservedParts.Memória.id).attributes.ramCapacity, 32);
+  assert.deepEqual(preservedMemory.interpretation.ignoredPreferences, ['preferredCpu']);
 
   const lmstudioSession = await session();
   const lmstudio = await api(lmstudioSession, '/api/model/config', { provider: 'lmstudio', baseUrl: `http://127.0.0.1:${modelPort}/v1`, model: 'local-test' });
