@@ -52,7 +52,7 @@ export function buildCandidates({ products, exceptions = [], budgetCents = Infin
     if (key === 'processor') processors = processors.filter((part) => String(part.id) === String(id));
     if (key === 'graphicsCard') gpus = gpus.filter((part) => part && String(part.id) === String(id));
   }
-  processors = priceSpread(processors, 24);
+  processors = priceSpread(processors, 32);
   if (dedicatedGpu && !preferredGpuId && gpus.length > 20) {
     const spread = Array.from({ length: 20 }, (_, index) => gpus[Math.round(index * (gpus.length - 1) / 19)]);
     gpus = [...new Map(spread.map((part) => [part.id, part])).values()];
@@ -120,8 +120,15 @@ export function buildCandidates({ products, exceptions = [], budgetCents = Infin
         const cpuAllocationPenalty = game && graphicsCard
           ? Math.abs((dollars(processor) / dollars(graphicsCard)) - 0.55) * dollars(graphicsCard) * 4.0 : 0;
         const platformPenalty = /ryzen\s*9/i.test(processor.name) && /\bA320\b|\bA520\b/i.test(motherboard.name) ? 100_000 : 0;
+        const legacyPlatform = /ddr\s*3/i.test(String(attr(motherboard, 'ramType') || motherboard.name)) || /\bLGA\s*11(?:55|56|50|60)\b/i.test(String(attr(motherboard, 'socket') || motherboard.name));
+        const legacyPenalty = game && budgetCents >= 350_000 && legacyPlatform ? 20_000_000 : 0;
+        const cpuCores = Number(attr(processor, 'coresQuantity')) || Number(String(processor.name).match(/\b(\d+)\s*[- ]?cores?\b/i)?.[1]) || 0;
+        const coreCountPenalty = game && budgetCents >= 350_000 && cpuCores > 0 && cpuCores < 6 ? 150_000 : 0;
+        const utilizationPenalty = game && Number.isFinite(budgetCents) ? Math.max(0, budgetCents * 0.8 - priceCents) * 3 : 0;
+        const gpuSharePenalty = game && graphicsCard && Number.isFinite(budgetCents)
+          ? Math.max(0, budgetCents * 0.34 - dollars(graphicsCard)) * 0.9 : 0;
         const score = game
-          ? priceCents - dollars(graphicsCard) * 1.8 + cpuAllocationPenalty + platformPenalty
+          ? priceCents - dollars(graphicsCard) * 1.8 + cpuAllocationPenalty + platformPenalty + legacyPenalty + coreCountPenalty + utilizationPenalty + gpuSharePenalty
           : priceCents + (preference.includes('silenc') && /rgb/i.test(processor.name) ? 0 : 0);
         candidates.push({ id: `build-${processor.id}-${graphicsCard?.id || 'igpu'}-${motherboard.id}`,
           parts: build, totalPriceCents: priceCents, compatibility, unknownRules: compatibility.unknownRules,

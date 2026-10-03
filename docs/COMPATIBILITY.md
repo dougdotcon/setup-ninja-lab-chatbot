@@ -20,3 +20,5 @@ O motor está em `server/domain/compatibility.js`. Cada regra retorna `PASS`, `F
 A API não traz BIOS instalada, todos os fatores de forma aceitos, todos os conectores da PSU, posição/tolerância de cabos, algumas alturas/folgas ou benchmarks. `UNKNOWN` deve ser explicado antes de compra. A ferramenta não promete que todo sistema inicializa, mantém estabilidade elétrica ou alcança uma taxa de quadros.
 
 O builder considera somente produtos em estoque e aplica orçamento ao total em centavos. Quantidades repetidas de RAM consomem estoque por SKU. Uma refinada mantém IDs das outras peças quando há candidatos que respeitem o orçamento e as regras; dependências relaxadas são devolvidas ao cliente. Uma escolha Jev passa novamente por este módulo antes de ser aceita.
+
+Para a finalidade gamer, a ordenação tenta aproximar o total de 80% do teto, manter participação mínima de custo na GPU e preferir seis ou mais núcleos quando publicados. Configurações DDR3 antigas recebem grande penalidade quando o teto permite uma alternativa. São sinais transparentes de alocação/era e contagem publicada, não benchmarks ou alegações de que a opção ranqueada vence outra em jogos.

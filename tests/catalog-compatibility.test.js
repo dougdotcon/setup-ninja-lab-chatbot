@@ -129,3 +129,14 @@ test('gamer candidates use bounded platform diversity without inventing performa
   assert.match(candidate.selectionPolicy, /não é benchmark/);
   assert.equal(candidate.compatibility.status, 'UNKNOWN');
 });
+
+test('a R$ 5k gaming request avoids legacy DDR3 and favors a viable GPU share', () => {
+  const official = normalizeCatalogPayload(snapshot);
+  const [candidate] = buildCandidates({ products: official.products, exceptions: official.exceptions,
+    budgetCents: 500_000, purpose: 'gaming', memoryGB: 16, dedicatedGpu: true, limit: 1 });
+  assert.ok(candidate);
+  assert.ok(candidate.totalPriceCents >= 350_000 && candidate.totalPriceCents <= 500_000);
+  assert.doesNotMatch(candidate.parts.motherboard.name, /DDR3/i);
+  assert.ok(Number(candidate.parts.processor.name.match(/\b(\d+)\s*[- ]?cores?\b/i)?.[1]) >= 6);
+  assert.ok(candidate.parts.graphicsCard.priceCents / 500_000 >= 0.30);
+});
