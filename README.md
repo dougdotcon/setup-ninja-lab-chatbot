@@ -58,10 +58,11 @@ docker compose start web
 
 ```sh
 npm test
+npm run lint
 npm run build
 ```
 
-Os testes cobrem normalização do snapshot, deduplicação, conflitos e incertezas, estoque por quantidade, regras de RAM/fonte/cooler, teto de preço, filtros de componentes e seleção Jev de candidatos fechados. A cobertura não substitui ensaio elétrico, medição de desempenho ou validação física da montagem.
+Os testes cobrem normalização do snapshot, deduplicação, conflitos e incertezas, estoque por quantidade, regras de RAM/fonte/cooler, teto de preço, filtros de componentes, seleção Jev de candidatos fechados e os pedidos literais do desafio por HTTP. Um endpoint local simulado verifica as duas chamadas do protocolo de linguagem e o fallback diante de informação inventada. A cobertura não substitui ensaio elétrico, medição de desempenho, validação física ou teste contra um modelo real.
 
 Documentação adicional: [fluxos e arquitetura](docs/ARCHITECTURE.md), [fonte e sincronização do catálogo](docs/CATALOG.md), [matriz de compatibilidade](docs/COMPATIBILITY.md), [configuração de provedores](docs/PROVIDERS.md) e [cenários/limites da avaliação](docs/EVALUATION.md).
 

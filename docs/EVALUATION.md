@@ -2,7 +2,7 @@
 
 ## Cenários verificáveis
 
-`npm test` executa testes unitários com o snapshot público versionado; não faz uma chamada a um provedor de IA. A suíte verifica IDs e estoque, preço em centavos, categorias repetidas, atributos de RAM, sockets, PFC, cooler obrigatório, folga de radiador/GPU, incertezas de gabinete/armazenamento, teto, candidatos oficiais e recusa de um ID Jev que não veio da lista.
+`npm test` executa testes de domínio e um percurso HTTP isolado, usando o snapshot público versionado. O percurso usa um servidor OpenAI-compatible simulado em `127.0.0.1`, sem credenciais. Para cada montagem, compara SKUs, quantidade, preço e total com o catálogo oficial, confirma estoque e ausência de regra `FAIL`, além de testar memória de sessão, RAG, escopo e fallback. A suíte também testa normalização, deduplicação, sockets, RAM, PFC, cooler, dimensões, orçamento, Jev com escolha fechada e prevenção de retrocesso do SQLite quando o snapshot embutido é mais antigo.
 
 | Caso | Resultado esperado / observado |
 |---|---|
@@ -14,12 +14,19 @@
 | Refinar placa de vídeo | Mantém os demais IDs da montagem anterior quando o catálogo oferece uma alternativa dentro do teto e a validação continua aprovada; caso contrário sinaliza dependências alteradas ou recusa. |
 | Fonte sem PFC declarado / folga física ausente | Incompatibilidade confirmada falha; dado ausente aparece `UNKNOWN`, nunca como garantia. |
 | Jev retorna ID não apresentado ou confiança abaixo de 0,55 | Rejeitar resultado e usar ranking determinístico; os preços e teto continuam sob controle do backend. |
+| “Não quero Intel” com R$ 7.000 e foco em 1440p | CPU AMD, plataforma não DDR3, itens oficiais disponíveis e total até R$ 7.000. Sem benchmark, 1440p é preferência de uso e não promessa de FPS. |
+| “Prefiro gastar mais na placa de vídeo” | Ranking gamer aplica prioridade de GPU; teste exige GPU mais cara que a CPU e evita DDR3. |
+| Ryzen 7, 32 GB, edição de vídeo, sem teto | Usa referência inicial declarada de R$ 8.000, respeita Ryzen 7 e ao menos 32 GB. Não apresenta a referência como orçamento informado pelo usuário. |
+| RTX 5070, sem teto | Usa referência declarada de R$ 15.000, preserva o modelo pedido e evita DDR3. |
+| Refinamento “32 GB e NVIDIA” | Uma mensagem muda simultaneamente RAM e GPU sobre a montagem anterior; o resultado mantém o teto anterior e sinaliza as categorias alteradas. |
+| Modelo local simulado | Interpretação JSON e geração são chamadas de fato; ID alucinado na interpretação não entra na montagem; descrição com produto/preço inventado cai na resposta local. |
+| Chat RAG e isolamento | Pergunta fora do escopo não recupera fontes; tentativa de trocar instruções é bloqueada; pergunta de SSD recupera citações de SKUs em estoque; sessões distintas não veem históricos uma da outra. |
 
 Esses valores são da captura de 02/10/2026 e podem divergir do catálogo atual. O teste não mede FPS, não confirma BIOS/forma física completa e não valida uma máquina montada.
 
 ## O que não foi conectado/testado
 
-Nenhuma chave de API foi fornecida. Portanto não houve chamada real a OpenAI, modelo OpenAI-compatible, Ollama, LM Studio ou Typesafe Jev nesta entrega. Os testes comprovam regras locais e validação de respostas fechadas, não disponibilidade do serviço externo, qualidade de geração, tokens ou uma execução Jev real. Neste host não há runtime local de LLM instalado; cada sessão pode conectar um endpoint permitido. Modo sem credencial é prévia determinística e aparece como tal na interface.
+Nenhuma chave de API foi fornecida. Houve teste real do protocolo OpenAI-compatible por servidor HTTP simulado, mas não uma chamada a OpenAI, Ollama, LM Studio ou Typesafe Jev reais. Os testes não comprovam disponibilidade externa, qualidade do modelo, contagem real de tokens ou uma execução Jev real. Neste host não há runtime local de LLM instalado; cada sessão pode conectar um endpoint permitido. Modo sem credencial é prévia determinística e aparece como tal na interface. A validação de texto do modelo é conservadora e rejeita referências numéricas/modelos sem fonte; texto livre ainda requer avaliação humana para garantias semânticas.
 
 ## Início informado e commits locais
 
@@ -43,5 +50,8 @@ O início do trabalho foi informado como **02/10/2026 às 18:25 em `America/Sao_
 | `cb02eab` | registro da avaliação de R$ 5.000 |
 | `6732bf6` | capacidade de armazenamento gamer e BIOS explicitamente desconhecida |
 | `docs: complete commit chronology` | atualização deste próprio histórico |
+| `4afcef4` | pedidos naturais, refinamento múltiplo, guarda do catálogo e verificação de saída do LLM |
+| `7600d70` | testes HTTP dos cenários do desafio, provedor local simulado e persistência SQLite |
+| `docs: document verified challenge flows and enable lint` | esta atualização de evidências, arquitetura e análise estática |
 
 O histórico local/tag `demo-v1` mantém a etapa demonstrativa anterior, mas seus produtos não fazem parte do catálogo ativo do montador. Os commits documentais mais recentes podem ser identificados pelo assunto exato em `git log`. Push ao GitHub depende de autenticação/gravação no remoto e não é inferido a partir do histórico local.
