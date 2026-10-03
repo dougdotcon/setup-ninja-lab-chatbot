@@ -7,7 +7,7 @@
 | Caso | Resultado esperado / observado |
 |---|---|
 | Pedido com RTX 5070 e limite R$ 5.000 | Sem montagem: a GPU oficial já supera o teto e o servidor não ignora a restrição. |
-| PC gamer sem modelo de GPU, teto R$ 5.000 | Candidato atual usa Ryzen 5 5500, RTX 3050 e DDR4 por R$ 4.004,44. O ranking penaliza plataformas DDR3 antigas e tenta reservar proporção do orçamento à GPU; não mede FPS. |
+| PC gamer sem modelo de GPU, teto R$ 5.000 | Pedido HTTP natural retorna Ryzen 5 5500 (6 núcleos), RTX 3050 e 16 GB DDR4 por R$ 4.004,44. Compatibilidade global permanece `UNKNOWN`: o catálogo não confirma todos os atributos da fonte, o formato placa-gabinete nem slots/interface SATA do armazenamento. O ranking penaliza DDR3 antigo e tenta reservar parte do teto à GPU; não mede FPS. |
 | Ryzen 7, RTX 5070, 32 GB, teto R$ 15.000 | Candidato oficial em estoque; a captura anterior usou Ryzen 7 5700 + RTX 5070 + 32 GB por R$ 11.044,61. O total não é promessa de desempenho; o ranking atual tenta aproximar 80% do teto sem inventar benchmark. |
 | Ryzen 7 8700G, RTX 5070, 32 GB, teto R$ 15.000 | Há candidato compatível de R$ 14.184,65 na captura. O ranking não garante selecioná-lo como opção gamer superior. |
 | Pedido de RAM 32 GB com SKU 16 GB | Seleciona quantidade 2, conta duas unidades e exige estoque suficiente; capacidade e slots são rechecados. |
