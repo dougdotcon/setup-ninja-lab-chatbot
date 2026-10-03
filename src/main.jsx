@@ -129,7 +129,7 @@ function Header({ onSearch, onAssistant, cartCount }) {
       <div className="store-promo">
         <span className="promo-mark"><Sparkles size={12} fill="currentColor" /></span>
         <strong>OFERTA NINJA</strong>
-        <span>Condições no PIX e até 12x sem juros.</span>
+        <span>Estoque oficial consultado · preços do catálogo.</span>
         <a href="https://www.setupninja.com.br/computadores" target="_blank" rel="noreferrer">
           Confira <ArrowRight size={13} />
         </a>
@@ -199,9 +199,9 @@ function Hero({ onChooseCategory }) {
         <div className="hero-promises">
           <span><ShieldCheck size={15} /> Compra segura</span>
           <i />
-          <span><Zap size={15} /> Até 12x sem juros</span>
+          <span><Zap size={15} /> 17 departamentos sincronizados</span>
           <i />
-          <span><Sparkles size={15} /> Pagamento no PIX</span>
+          <span><Sparkles size={15} /> Preço do catálogo</span>
         </div>
       </div>
       <div className="hero-art">
@@ -219,7 +219,7 @@ function Hero({ onChooseCategory }) {
           />
         </div>
         <div className="hero-spec"><span><Cpu size={17} /></span><span><strong>RYZEN 5</strong><small>POTÊNCIA PRONTA</small></span><b>01</b></div>
-        <div className="hero-offer"><strong>PIX</strong><span>CONDIÇÃO<br />ESPECIAL</span></div>
+        <div className="hero-offer"><strong>CATÁLOGO</strong><span>ESTOQUE<br />CONSULTADO</span></div>
         <span className="hero-grid-label">SN — 05 / 2026</span>
       </div>
       <div className="hero-pagination" aria-label="Slide 1 de 3">
@@ -235,11 +235,11 @@ function BenefitBar() {
     <div className="benefit-strip">
       <div className="benefit">
         <span className="benefit-icon"><Zap size={17} /></span>
-        <span><strong>Pagamento no PIX</strong><small>Mais setup pelo seu dinheiro</small></span>
+        <span><strong>Preço publicado</strong><small>Sem condição de pagamento presumida</small></span>
       </div>
       <div className="benefit">
         <span className="benefit-icon"><ShoppingCart size={17} /></span>
-        <span><strong>Até 12x sem juros</strong><small>Parcele seu equipamento</small></span>
+        <span><strong>Estoque por produto</strong><small>Quantidade informada pela loja</small></span>
       </div>
       <div className="benefit">
         <span className="benefit-icon"><ShieldCheck size={17} /></span>
@@ -294,8 +294,8 @@ function ProductCard({ product, index, onAdd }) {
         <div className="product-spacer" />
         {Number.isFinite(product.price_brl) ? (
           <>
-            {Number.isFinite(product.list_price_brl) ? <span className="old-price">{compactMoney(product.list_price_brl)}</span> : <span className="old-price muted-pix">Condição da coleta</span>}
-            <p className="pix-price"><strong>{compactMoney(product.price_brl)}</strong><span> no PIX</span></p>
+            {Number.isFinite(product.list_price_brl) ? <span className="old-price">{compactMoney(product.list_price_brl)}</span> : null}
+            <p className="pix-price"><strong>{compactMoney(product.price_brl)}</strong><span> preço publicado</span></p>
             {Number.isFinite(product.installment_price_brl) && product.installments ? (
               <p className="installment-price">ou <b>{product.installments}x</b> de <b>{compactMoney(product.installment_price_brl)}</b> sem juros</p>
             ) : null}
@@ -340,8 +340,10 @@ function ChatWidget({ open, setOpen, setPanel, panel }) {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [lastBuildId, setLastBuildId] = useState('');
   useEffect(() => {
     api('/api/session').then((data) => setStatus(data)).catch(() => setStatus(null));
+    api('/api/build/history').then((data) => { if (data.builds?.[0]?.id) setLastBuildId(data.builds[0].id); }).catch(() => {});
     const handler = () => setOpen(true);
     window.addEventListener('open-ninja-chat', handler);
     return () => window.removeEventListener('open-ninja-chat', handler);
@@ -359,14 +361,26 @@ function ChatWidget({ open, setOpen, setPanel, panel }) {
     setBusy(true);
     setMessages((list) => [...list, { id: crypto.randomUUID(), role: 'user', content: message }]);
     try {
-      const result = await api('/api/chat', { method: 'POST', body: JSON.stringify({ message }) });
+      const buildIntent = /\b(?:monta(?:r|gem)?|monte|build|or[cç]amento de pc|pc gamer|computador gamer|montagem de pc)\b/i.test(message)
+        || (lastBuildId && /\b(?:troca|troque|muda|mude|substitui|substitua|upgrade)\b.*\b(?:placa|gpu|processador|cpu|mem[oó]ria|ram|ssd|fonte|gabinete|cooler)\b/i.test(message));
+      const result = buildIntent
+        ? await api('/api/build', { method: 'POST', body: JSON.stringify({ request: message, previousBuildId: lastBuildId || undefined }) })
+        : await api('/api/chat', { method: 'POST', body: JSON.stringify({ message }) });
+      if (buildIntent && result.clarification) {
+        setMessages((list) => [...list, { id: crypto.randomUUID(), role: 'assistant', content: result.answer }]);
+        return;
+      }
+      const built = buildIntent && result.selected;
+      const citations = built ? result.selected.items.map((item) => ({ id: item.id, productId: item.id, title: item.name, category: item.category, url: item.url || item.sourceUrl })) : result.citations;
+      const answer = built ? `${result.selected.explanation}\n\nPeças e preços conferidos no catálogo oficial. Total: ${money.format(result.selected.totalPriceCents / 100)}.` : result.answer;
       setMessages((list) => [...list, {
         id: crypto.randomUUID(), role: 'assistant',
-        content: result.answer, citations: result.citations, telemetry: result.telemetry,
+        content: answer, citations, telemetry: built ? { ...result.telemetry, mode: 'pc_builder', model: result.generation.model || result.decision.model } : result.telemetry,
       }]);
-      setStatus((value) => value ? { ...value, providerConfigured: result.telemetry.mode === 'api_openai_compatível' } : value);
+      if (built) setLastBuildId(result.buildId);
+      if (!built) setStatus((value) => value ? { ...value, providerConfigured: result.telemetry.mode === 'api_openai_compatível' } : value);
       window.dispatchEvent(new Event('ninja-runs-changed'));
-      if (result.telemetry.mode.includes('fallback')) setError('A API não respondeu. O modo local respondeu usando o catálogo.');
+      if (!built && result.telemetry.mode.includes('fallback')) setError('A API não respondeu. O modo local respondeu usando o catálogo.');
     } catch (reason) {
       setError(reason.message);
       setMessages((list) => list.filter((item) => item.role !== 'user' || item.content !== message));
@@ -409,7 +423,7 @@ function ChatWidget({ open, setOpen, setPanel, panel }) {
           {error ? <div role="alert" className="chat-error">{error}</div> : null}
           {messages.length < 3 ? (
             <div className="suggested-prompts">
-              <button onClick={() => setDraft('Qual PC gamer cabe até R$ 4000?')}>PC até R$ 4.000?</button>
+              <button onClick={() => setDraft('Monte um PC gamer até R$ 4.000')}>PC até R$ 4.000?</button>
               <button onClick={() => setDraft('Qual é a diferença entre os headsets?')}>Comparar headsets</button>
             </div>
           ) : null}
@@ -510,12 +524,12 @@ function DatabasePanel() {
         <button disabled={page + 1 >= pageCount} onClick={() => setPage(page + 1)} aria-label="Próxima página"><ChevronRight size={15} /></button>
       </div>
       <details className="scrape-coverage">
-        <summary><span>Relatório de coleta <span className="coverage-tag">PARCIAL · TRANSPARENTE</span></span><ChevronDown size={15} /></summary>
+        <summary><span>Relatório do catálogo <span className="coverage-tag">FONTE OFICIAL</span></span><ChevronDown size={15} /></summary>
         {report ? (
           <div className="coverage-body">
             <p>{report.method}</p>
             <p>{report.coverage_note}</p>
-            <ul>{report.categories_verified_in_store_departments?.map((category) => <li key={category}>{category} <span>menu verificado · preço não coletado</span></li>)}</ul>
+            <ul>{report.categories_verified_in_store_departments?.map((category) => <li key={category}>{category} <span>API oficial consultada</span></li>)}</ul>
             <a href={report.store} target="_blank" rel="noreferrer">Abrir Setup Ninja <ArrowRight size={12} /></a>
           </div>
         ) : null}
@@ -529,16 +543,22 @@ function ModelPanel({ session, onConnected, onRefreshRuns }) {
   const [initial, setInitial] = useState(null);
   const [model, setModel] = useState('gpt-4o-mini');
   const [baseUrl, setBaseUrl] = useState('https://api.openai.com/v1');
+  const [provider, setProvider] = useState('openai');
   const [key, setKey] = useState('');
+  const [jevConfigured, setJevConfigured] = useState(false);
+  const [jevKey, setJevKey] = useState('');
+  const [jevMessage, setJevMessage] = useState('');
   const [pending, setPending] = useState('');
   const [message, setMessage] = useState('');
   const [failure, setFailure] = useState(false);
   const [testing, setTesting] = useState(false);
   useEffect(() => {
-    api('/api/model/config').then((config) => {
+    Promise.all([api('/api/model/config'), api('/api/decision/config')]).then(([config, decision]) => {
       setInitial(config.configured);
       setModel(config.model || 'gpt-4o-mini');
       setBaseUrl(config.baseUrl || 'https://api.openai.com/v1');
+      setProvider(config.provider || 'openai');
+      setJevConfigured(decision.configured);
     }).catch((error) => { setFailure(true); setMessage(error.message); });
   }, []);
   const configured = initial ?? session?.providerConfigured;
@@ -548,13 +568,22 @@ function ModelPanel({ session, onConnected, onRefreshRuns }) {
     setPending('connect');
     try {
       const result = await api('/api/model/config', {
-        method: 'POST', body: JSON.stringify({ model, baseUrl, apiKey: key }),
+        method: 'POST', body: JSON.stringify({ model, baseUrl, apiKey: key, provider }),
       });
       setKey('');
       setInitial(true);
       setMessage(result.note);
       await onConnected();
     } catch (error) { setFailure(true); setMessage(error.message); }
+    finally { setPending(''); }
+  }
+  async function connectJev(event) {
+    event.preventDefault();
+    setPending('jev'); setJevMessage('');
+    try {
+      const result = await api('/api/decision/config', { method: 'POST', body: JSON.stringify({ apiKey: jevKey }) });
+      setJevKey(''); setJevConfigured(result.configured); setJevMessage(result.configured ? result.note : 'Decisão Jev desligada; o ranking determinístico continua ativo.');
+    } catch (error) { setFailure(true); setJevMessage(error.message); }
     finally { setPending(''); }
   }
   async function runConnectionTest() {
@@ -589,18 +618,26 @@ function ModelPanel({ session, onConnected, onRefreshRuns }) {
       <div className={'connection-card' + (configured ? ' is-connected' : '')}>
         <span className="connection-indicator" />
         <span><strong>{configured ? 'Modelo pronto para responder' : 'Modo demonstração local'}</strong>
-          <small>{configured ? model + ' · chave somente em memória' : 'Respostas reais do catálogo · sem chave necessária'}</small></span>
+          <small>{configured ? model + ' · ' + provider + (key ? ' · chave somente em memória' : ' · endpoint local') : 'Prévia determinística · nenhuma chamada de LLM'}</small></span>
         <span className={'connection-status' + (configured ? ' online' : '')}>{configured ? 'ATIVO' : 'LOCAL'}</span>
       </div>
-      <div className="panel-section-heading"><h3>PROVEDOR OPENAI-COMPATIBLE</h3><span>ACESSO POR ESTA SESSÃO</span></div>
+      <div className="panel-section-heading"><h3>MODELO DE CONVERSA</h3><span>ACESSO POR ESTA SESSÃO</span></div>
       <form className="llm-form" onSubmit={connect}>
-        <label htmlFor="llm-base-url">URL base da API <span>HTTPS</span></label>
+        <label htmlFor="llm-provider">Provedor</label>
+        <select id="llm-provider" value={provider} onChange={(event) => {
+          const next = event.target.value; setProvider(next);
+          if (next === 'openai') { setBaseUrl('https://api.openai.com/v1'); setModel('gpt-4o-mini'); }
+          if (next === 'ollama') { setBaseUrl('http://host.docker.internal:11434/v1'); setModel('llama3.1'); }
+          if (next === 'lmstudio') { setBaseUrl('http://host.docker.internal:1234/v1'); setModel('local-model'); }
+          if (next === 'openai-compatible') { setBaseUrl(''); setModel(''); }
+        }}><option value="openai">OpenAI</option><option value="ollama">Ollama local</option><option value="lmstudio">LM Studio local</option><option value="openai-compatible">OpenAI compatível (HTTPS)</option></select>
+        <label htmlFor="llm-base-url">URL base <span>{provider === 'ollama' || provider === 'lmstudio' ? 'ALLOWLIST DO SERVIDOR' : 'HTTPS'}</span></label>
         <input id="llm-base-url" type="url" spellCheck="false" autoComplete="off" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} required />
         <label htmlFor="llm-model">Modelo</label>
         <input id="llm-model" autoComplete="off" value={model} onChange={(event) => setModel(event.target.value)} placeholder="gpt-4o-mini" required />
-        <label htmlFor="llm-key">Chave da API <span>SEGREDO</span></label>
-        <div className="secret-input"><input id="llm-key" type="password" autoComplete="new-password" spellCheck="false" value={key} onChange={(event) => { setKey(event.target.value); setFailure(false); setMessage(''); }} placeholder={configured ? 'Chave da sessão já conectada' : 'sk-…'} required={!configured} /><ShieldCheck size={16} /></div>
-        <div className="secret-notice"><ShieldCheck size={14} /><span>A chave é mantida <b>somente em memória</b>, nesta sessão. Sem banco, histórico ou localStorage. Expira em 1 hora.</span></div>
+        <label htmlFor="llm-key">Chave da API <span>{provider === 'ollama' || provider === 'lmstudio' ? 'OPCIONAL' : 'SEGREDO'}</span></label>
+        <div className="secret-input"><input id="llm-key" type="password" autoComplete="new-password" spellCheck="false" value={key} onChange={(event) => { setKey(event.target.value); setFailure(false); setMessage(''); }} placeholder={configured ? 'Chave mantida nesta sessão' : 'Não informado'} required={!configured && provider !== 'ollama' && provider !== 'lmstudio'} /><ShieldCheck size={16} /></div>
+        <div className="secret-notice"><ShieldCheck size={14} /><span>Chaves ficam <b>somente em memória</b>, nesta sessão. Nunca entram no SQLite ou logs. Conexão local exige endpoint liberado pelo administrador; o navegador usa o servidor, não o PC de quem visita.</span></div>
         {message ? <div role={failure ? 'alert' : 'status'} className={'connection-message' + (failure ? ' failure' : '')}>{failure ? <CircleHelp size={14} /> : <Check size={14} />}{message}</div> : null}
         <button className="connect-button" type="submit" disabled={pending === 'connect'}>
           {pending === 'connect' ? <span className="mini-loader" /> : <Zap size={15} />}
@@ -613,6 +650,14 @@ function ModelPanel({ session, onConnected, onRefreshRuns }) {
           <button onClick={disconnect} disabled={pending === 'disconnect'}><X size={14} />Desconectar</button>
         </div>
       ) : null}
+      <div className="panel-section-heading chat-mode-title"><h3>DECISÕES OPCIONAIS · TYPESAFE JEV</h3><span>{jevConfigured ? 'CONECTADO' : 'NÃO CONFIGURADO'}</span></div>
+      <p className="jev-note">Jev escolhe somente entre montagens já validadas e dentro do orçamento. Ele não escreve a resposta; a explicação vem do modelo de conversa ou do montador local.</p>
+      <form className="llm-form" onSubmit={connectJev}>
+        <label htmlFor="jev-key">Chave Typesafe <span>SESSÃO</span></label>
+        <div className="secret-input"><input id="jev-key" type="password" autoComplete="new-password" spellCheck="false" value={jevKey} onChange={(event) => setJevKey(event.target.value)} placeholder={jevConfigured ? 'Chave mantida nesta sessão' : 'Sem chave: fallback determinístico'} /><ShieldCheck size={16} /></div>
+        {jevMessage ? <div role="status" className="connection-message">{jevMessage}</div> : null}
+        <button className="connect-button" disabled={pending === 'jev'}><Zap size={14} />{jevConfigured ? 'Atualizar Jev' : 'Conectar Jev opcional'}</button>
+      </form>
       <div className="panel-section-heading chat-mode-title"><h3>COMO AS RESPOSTAS FUNCIONAM</h3><span>RAG LOCAL</span></div>
       <div className="model-flow">
         <span><Search size={15} /><b>Sua pergunta</b></span><ArrowRight size={13} />
@@ -719,11 +764,79 @@ function Footer() {
           <span className="footer-demo"><i /> VITRINE DEMONSTRATIVA · PREÇOS CAPTURADOS PARA TESTE</span>
         </div>
         <div className="footer-col"><strong>SEU PRÓXIMO PC</strong><a href="#vitrine">PC gamer</a><a href="#vitrine">PC para montar</a><a href="#vitrine">Placas de vídeo</a><a href="#vitrine">Memória e SSD</a></div>
-        <div className="footer-col"><strong>AJUDA DE NINJA</strong><a href="#vitrine">Sobre os preços da amostra</a><a href="#vitrine">Produtos e hardware</a><a href="#vitrine">Pergunte ao NinjaRUDEUS</a><a href="https://www.setupninja.com.br/" target="_blank" rel="noreferrer">Loja Setup Ninja original</a></div>
+        <div className="footer-col"><strong>AJUDA DE NINJA</strong><a href="#vitrine">Sobre o catálogo oficial</a><a href="#vitrine">Produtos e hardware</a><a href="#vitrine">Pergunte ao NinjaRUDEUS</a><a href="https://www.setupninja.com.br/" target="_blank" rel="noreferrer">Loja Setup Ninja original</a></div>
         <div className="footer-contact"><span>SEU SUPORTE DE HARDWARE</span><strong>Setup bom é setup escolhido certo.</strong><a href="https://www.setupninja.com.br/" target="_blank" rel="noreferrer">Conheça a loja original <ArrowRight size={14} /></a></div>
       </div>
       <div className="footer-bottom"><span>Setup Ninja · demonstração de vitrine com dados públicos da loja.</span><span>PREÇOS CAPTURADOS EM 02/10/2026 · CONSULTE A LOJA PARA VALORES E DISPONIBILIDADE ATUAIS</span></div>
     </footer>
+  );
+}
+
+function PcBuilder() {
+  const [options, setOptions] = useState(null);
+  const [budget, setBudget] = useState('5000');
+  const [memoryGB, setMemoryGB] = useState('32');
+  const [request, setRequest] = useState('PC gamer para jogos em 1440p');
+  const [dedicatedGpu, setDedicatedGpu] = useState(true);
+  const [gpuId, setGpuId] = useState('');
+  const [cpuVendor, setCpuVendor] = useState('');
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => { api('/api/build/options').then(setOptions).catch((reason) => setError(reason.message)); }, []);
+  async function submit(event, previousBuildId = '') {
+    event?.preventDefault();
+    setLoading(true); setError('');
+    try {
+      const next = await api('/api/build', { method: 'POST', body: JSON.stringify({ budget: Number(budget), memoryGB: Number(memoryGB), request,
+        dedicatedGpu, gpuId: gpuId || undefined, cpuVendor: cpuVendor || undefined, previousBuildId: previousBuildId || undefined }) });
+      setResult(next);
+    } catch (reason) { setError(reason.message); }
+    finally { setLoading(false); }
+  }
+  const selected = result?.selected;
+  return (
+    <section className="pc-builder" aria-labelledby="builder-title">
+      <div className="builder-intro"><span className="section-overline"><span />MONTAGEM BASEADA NO ESTOQUE REAL</span>
+        <h1 id="builder-title">Monte seu PC<br /><em>sem comprar no escuro.</em></h1>
+        <p>Peças, preços e estoque vêm do configurador oficial. Regras determinísticas filtram conflitos conhecidos; dados que faltam aparecem como incertezas.</p>
+      </div>
+      <div className="builder-layout">
+        <form className="builder-form" onSubmit={submit}>
+          <label>Seu pedido<textarea value={request} onChange={(event) => setRequest(event.target.value)} rows="3" maxLength="900" placeholder="Ex.: Ryzen 7 com RTX 5070 e 32 GB de RAM" /></label>
+          <div className="builder-fields">
+            <label>Limite de preço (R$)<input inputMode="decimal" type="number" min="100" step="100" value={budget} onChange={(event) => setBudget(event.target.value)} required /></label>
+            <label>Memória desejada<select value={memoryGB} onChange={(event) => setMemoryGB(event.target.value)}><option value="16">16 GB</option><option value="32">32 GB</option><option value="64">64 GB</option></select></label>
+          </div>
+          <div className="builder-fields">
+            <label>Plataforma de CPU<select value={cpuVendor} onChange={(event) => setCpuVendor(event.target.value)}><option value="">Sem preferência</option><option value="amd">AMD</option><option value="intel">Intel</option></select></label>
+            <label>Placa de vídeo<select value={gpuId} onChange={(event) => { setGpuId(event.target.value); if (event.target.value) setDedicatedGpu(true); }} disabled={!options}><option value="">Qualquer modelo cabível</option>{options?.gpus.map((gpu) => <option key={gpu.id} value={gpu.id}>{gpu.name} · {money.format(gpu.priceCents / 100)}</option>)}</select></label>
+          </div>
+          <label className="builder-check"><input type="checkbox" checked={dedicatedGpu} onChange={(event) => setDedicatedGpu(event.target.checked)} /> Incluir placa de vídeo dedicada</label>
+          <button className="builder-submit" disabled={loading || !options}>{loading ? 'CHECANDO O CATÁLOGO…' : 'MONTAR UMA SUGESTÃO'} <ArrowRight size={16} /></button>
+          {error ? <p className="builder-error" role="alert">{error}</p> : null}
+          <small>Sem conexão de modelo, o montador determinístico continua funcionando. Nenhuma opção ultrapassa o teto enviado.</small>
+        </form>
+        <div className="builder-result" aria-live="polite">
+          {selected ? <>
+            <div className="builder-result-head"><span className={'compat-badge status-' + selected.compatibility.status.toLowerCase()}><ShieldCheck size={14} /> Compatibilidade {selected.compatibility.status}</span>
+              <strong>{money.format(selected.totalPriceCents / 100)}</strong><small>total dos itens selecionados</small></div>
+            <p className="builder-copy">{selected.explanation}</p>
+            <div className="builder-parts">{selected.items.map((part) => <article key={part.id}>
+              <div><span>{part.category}{part.quantity > 1 ? ` · ${part.quantity} unidades` : ''}</span><strong>{part.name}</strong>
+                <small>Estoque consultado: {part.stockQuantity} · ID {part.id}</small></div>
+              <b>{money.format(part.totalPriceCents / 100)}</b>
+            </article>)}</div>
+            {selected.unknownRules.length ? <div className="builder-unknown"><strong>Dados que faltam na loja</strong><p>{selected.unknownRules.join(' · ')}. Isso não é confirmação de encaixe; valide esses pontos antes da compra.</p></div> : null}
+            <div className="builder-audit"><span>Decisão: {result.decision.provider} · {result.decision.model}{result.decision.fallback ? ' (fallback)' : ''}</span>
+              <span>Explicação: {result.generation.called ? result.generation.provider + ' · ' + result.generation.model : 'prévia local; sem modelo conectado'}</span>
+              <span>Catálogo: fonte oficial · {result.telemetry.durationMs} ms</span></div>
+            {result.candidates.length > 1 ? <details className="builder-alternatives"><summary>{result.candidates.length - 1} outras opções viáveis</summary>{result.candidates.slice(1).map((candidate) => <div key={candidate.id}><span>{candidate.items[0]?.name} · {candidate.items.find((item) => item.category === 'Placa de vídeo')?.name || 'vídeo integrado'}</span><b>{money.format(candidate.totalPriceCents / 100)}</b></div>)}</details> : null}
+            <button className="builder-refine" onClick={(event) => submit(event, result.buildId)}>Trocar uma peça mantendo o restante <ArrowRight size={14} /></button>
+          </> : <div className="builder-empty"><Cpu size={38} /><strong>Uma lista de peças, com as contas na mesa.</strong><p>O resultado inclui evidências, estoque por SKU e limites que o catálogo não permite confirmar.</p></div>}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -741,6 +854,7 @@ function App() {
   const [loadError, setLoadError] = useState('');
   const [notice, setNotice] = useState('');
   const [cart, setCart] = useState(0);
+  const [view, setView] = useState('store');
 
   async function refreshSession() {
     try { setSession(await api('/api/session')); }
@@ -809,6 +923,11 @@ function App() {
       <Header onSearch={setQuery} onAssistant={() => setChatOpen(true)} cartCount={cart} />
       <main>
         <div className="store-main">
+          <div className="store-view-tabs" role="tablist" aria-label="Área da demonstração">
+            <button role="tab" aria-selected={view === 'store'} className={view === 'store' ? 'active' : ''} onClick={() => setView('store')}>Loja e catálogo</button>
+            <button role="tab" aria-selected={view === 'builder'} className={view === 'builder' ? 'active' : ''} onClick={() => setView('builder')}>Monte seu PC <Cpu size={15} /></button>
+          </div>
+          {view === 'builder' ? <PcBuilder /> : <>
           <nav className="breadcrumb" aria-label="Navegação estrutural">
             <a href="#inicio">Início</a><ChevronRight size={12} /><span>O marketplace do seu próximo setup</span>
             {query ? <><ChevronRight size={12} /><strong>{query}</strong><button onClick={() => setQuery('')} aria-label="Limpar busca"><X size={12} /></button></> : null}
@@ -832,7 +951,7 @@ function App() {
               <div className="collection-controls">
                 <label className="sort-control"><SlidersHorizontal size={15} /><span>Ordenar:</span>
                   <select value={sort} onChange={(event) => setSort(event.target.value)} aria-label="Ordenar produtos">
-                    <option value="featured">Destaques</option><option value="price-asc">Menor preço no PIX</option><option value="price-desc">Maior preço no PIX</option>
+                    <option value="featured">Destaques</option><option value="price-asc">Menor preço</option><option value="price-desc">Maior preço</option>
                   </select><ChevronDown size={13} /></label>
                 <span className="collection-pagination">{products.length ? '1—' + products.length : '0'} de {total}</span>
               </div>
@@ -856,6 +975,7 @@ function App() {
               <span className="callout-orbit" aria-hidden="true" /><Sparkles className="callout-sparkle" size={49} />
             </section>
           </section>
+          </>}
         </div>
       </main>
       <Footer />
