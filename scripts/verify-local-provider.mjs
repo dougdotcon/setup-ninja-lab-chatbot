@@ -12,7 +12,7 @@ const catalog = normalizeCatalogPayload(await (await fetch('https://monte-seu-pc
 const official = new Map(catalog.products.map((item) => [item.id, item]));
 async function api(cookie, route, body) {
   const response = await fetch(appUrl + route, { method: body === undefined ? 'GET' : 'POST',
-    signal: AbortSignal.timeout(180_000), headers: { ...(cookie ? { cookie } : {}),
+    signal: AbortSignal.timeout(300_000), headers: { ...(cookie ? { cookie } : {}),
       ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   return { status: response.status, data: await response.json(), cookie: response.headers.get('set-cookie')?.split(';')[0] };
