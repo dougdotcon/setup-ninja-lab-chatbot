@@ -26,10 +26,19 @@ export function interpretRequest(text) {
 }
 
 export function isPcBuildIntent(text, hasPreviousBuild = false) {
-  const normalized = normalizeRequest(text);
-  if (interpretRequest(text).gpuPriority && parseBrazilianBudget(text) !== null) return true;
-  if (/\b(?:mont\w*|configur\w*|setup|computador|pc)\b/.test(normalized) &&
-      /\b(?:mont\w*|configur\w*|setup|computador|pc|ryzen|rtx|orcamento|ate\s+r\$)\b/.test(normalized)) return true;
-  if (/\b(?:troqu\w*|mud\w*|substitu\w*|upgrade|agora\s+quero)\b/.test(normalized) && hasPreviousBuild) return true;
-  return hasPreviousBuild && /\b(?:\d{1,3}\s*gb|nvidia|amd|intel|ryzen|rtx|gtx|radeon|gpu|fonte|ssd|gabinete|cooler)\b/.test(normalized);
+  const normalized = normalizeRequest(text).trim();
+  const budget = parseBrazilianBudget(text);
+  // Questions about using, comparing or installing a component belong to RAG,
+  // even when they mention a PC or there is an earlier configuration.
+  const informational = /^(?:e\s+)?(?:como|qual|quais|o que|por que|porque|quando|onde)\b/.test(normalized)
+    || /\bcomo\s+(?:instal|atualiz|conect|configur|troco|trocar)/.test(normalized);
+  const asksRecommendation = /\b(?:recomend\w*|suger\w*|sugest\w*|indica\w*)\b/.test(normalized);
+  if (informational && !asksRecommendation && !(budget !== null && /\bmont\w*/.test(normalized))) return false;
+  if (interpretRequest(text).gpuPriority && budget !== null) return true;
+  const mentionsComputer = /\b(?:computador|pc|configuracao|setup)\b/.test(normalized);
+  const requestsComputer = /\b(?:quero|preciso|procuro|gostaria|pretendo|monte|montar|sugira|recomende|configure)\b/.test(normalized);
+  if (mentionsComputer && (requestsComputer || asksRecommendation || budget !== null)) return true;
+  if (!hasPreviousBuild) return false;
+  const component = /\b(?:peca|componente|processador|placa|memoria|ram|nvidia|amd|intel|ryzen|rtx|gtx|radeon|gpu|fonte|ssd|gabinete|cooler|\d{1,3}\s*gb)\b/.test(normalized);
+  return component && /\b(?:troqu\w*|trocar|mud\w*|substitu\w*|upgrade|quero|prefiro|use|com|sem|mais|menos)\b/.test(normalized);
 }

@@ -20,3 +20,16 @@ test('the public chat recognizes build and refinement turns', () => {
   assert.equal(isPcBuildIntent('Agora quero 32 GB de RAM', true), true);
   assert.equal(isPcBuildIntent('Qual a diferença entre SSD SATA e NVMe?'), false);
 });
+
+
+test('hardware instructions and comparisons stay in RAG after an earlier build', () => {
+  for (const question of ['Como instalar memória RAM no PC com segurança?',
+    'Qual SSD é compatível com meu PC?', 'Qual a diferença entre NVIDIA e AMD?',
+    'Tenho um PC; como instalar Windows?', 'Como troco o cooler do processador?']) {
+    assert.equal(isPcBuildIntent(question), false, question);
+    assert.equal(isPcBuildIntent(question, true), false, question);
+  }
+  assert.equal(isPcBuildIntent('Pode trocar a placa de vídeo por uma NVIDIA?', true), true);
+  assert.equal(isPcBuildIntent('Qual configuração você recomenda até R$ 5.000?'), true);
+  assert.equal(isPcBuildIntent('PC até R$ 4.000?'), true);
+});
