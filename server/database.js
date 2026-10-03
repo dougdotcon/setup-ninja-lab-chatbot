@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { CATEGORY_LABELS, CATEGORY_SLUGS, normalizeCatalogPayload } from './domain/catalog.js';
+import { HARDWARE_GUIDES, isHardwareGuideQuery } from './domain/hardware-guides.js';
 
 const projectRoot = fileURLToPath(new URL('..', import.meta.url));
 const databaseDir = path.resolve(process.env.SETUPNINJA_DATA_DIR || path.join(projectRoot, 'data'));
@@ -85,6 +86,8 @@ for (const [column, definition] of Object.entries({
   category_key: 'TEXT', category_name: 'TEXT', attributes_json: "TEXT NOT NULL DEFAULT '{}'",
   tags_json: "TEXT NOT NULL DEFAULT '[]'", source_kind: "TEXT NOT NULL DEFAULT 'demo'",
 })) ensureColumn('products', column, definition);
+ensureColumn('knowledge_chunks', 'guide_key', 'TEXT');
+database.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_knowledge_chunks_guide_key ON knowledge_chunks(guide_key) WHERE guide_key IS NOT NULL');
 for (const [column, definition] of Object.entries({
   available_count: 'INTEGER NOT NULL DEFAULT 0', out_of_stock_count: 'INTEGER NOT NULL DEFAULT 0',
   source_kind: "TEXT NOT NULL DEFAULT 'demo'",
@@ -126,6 +129,24 @@ const catalogSnapshotPath = path.join(projectRoot, 'data/catalog-api.snapshot.js
 const catalogRun = database.prepare(`INSERT INTO catalog_sync_runs
   (source, last_update, synced_at, products, available, unavailable, status, in_stock_listings, out_of_stock_listings)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+function ensureHardwareGuides() {
+  const insert = database.prepare(`INSERT INTO knowledge_chunks
+    (title, content, category, source_title, source_url, product_id, scraped_at, guide_key)
+    VALUES (?, ?, 'Guias de hardware', ?, ?, NULL, ?, ?)`);
+  const find = database.prepare(`SELECT id, title, content, source_title, source_url
+    FROM knowledge_chunks WHERE guide_key=?`);
+  const remove = database.prepare('DELETE FROM knowledge_chunks WHERE guide_key=?');
+  const now = new Date().toISOString();
+  for (const guide of HARDWARE_GUIDES) {
+    const existing = find.get(guide.id);
+    if (existing && existing.title === guide.title && existing.content === guide.content &&
+      existing.source_title === guide.sourceTitle && existing.source_url === guide.sourceUrl) continue;
+    // Delete + insert so external-content FTS triggers remove stale terms and index changed guide text.
+    if (existing) remove.run(guide.id);
+    insert.run(guide.title, guide.content, guide.sourceTitle, guide.sourceUrl, now, guide.id);
+  }
+}
+
 export function syncOfficialCatalog(payload, { force = false } = {}) {
   const normalized = normalizeCatalogPayload(payload);
   const previous = database.prepare('SELECT last_update FROM catalog_sync_runs WHERE source = ? ORDER BY id DESC LIMIT 1').get(normalized.source);
@@ -170,10 +191,15 @@ export function syncOfficialCatalog(payload, { force = false } = {}) {
       const categoryName = product.categoryKeys.map((key) => CATEGORY_LABELS[key]).join(' · ');
       const attributes = JSON.stringify(product.attributes);
       const tags = JSON.stringify(product.tags);
+      const searchableSpecs = Object.entries(product.attributes).filter(([key, value]) =>
+        ['socket', 'sockets', 'tdp', 'minimumPowerSupply', 'hasCooler', 'hasGpu', 'maxRamCapacity', 'ramType',
+          'cpuType', 'ramSlotsQuantity', 'm2SlotsQuantity', 'ramCapacity', 'modulesQuantity', 'gpuType', 'gpu',
+          'maxGpuSize', 'formFactor', 'maxCpuTdp', 'hasPFC', 'waterCoolerSizes', 'wifiType', 'bands', 'compatibility'].includes(key)
+        && value != null).map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : typeof value === 'boolean' ? (value ? 'sim' : 'não') : value}`).join('. ');
       const description = [product.name, product.sku && `SKU ${product.sku}`, categoryName,
         `Preço do catálogo: R$ ${(product.priceCents / 100).toFixed(2)}`,
         product.inStock ? `Estoque informado: ${product.stockQuantity}` : 'Sem estoque no snapshot consultado',
-        ...product.tags.slice(0, 16)].filter(Boolean).join('. ');
+        ...product.tags.slice(0, 16), searchableSpecs].filter(Boolean).join('. ');
       insertProduct.run(product.id, product.name, product.brand, product.sku, product.priceCents / 100,
         description, product.imageUrl, product.productUrl || product.sourceUrl, product.sourceUrl,
         product.inStock ? `Em estoque (${product.stockQuantity})` : 'Sem estoque no snapshot', now,
@@ -215,11 +241,13 @@ export function syncOfficialCatalog(payload, { force = false } = {}) {
     database.exec('ROLLBACK');
     throw error;
   }
+  ensureHardwareGuides();
   return { ...normalized.counts, lastUpdate: normalized.lastUpdate, unchanged: false };
 }
 
 const bundledCatalog = JSON.parse(readFileSync(catalogSnapshotPath, 'utf8'));
 syncOfficialCatalog(bundledCatalog);
+ensureHardwareGuides();
 
 // Operador público pode inspecionar somente catálogo/coleta; históricos são isolados por sessão.
 export const allowedTables = [
@@ -258,13 +286,22 @@ const insertRagRun = database.prepare(`INSERT INTO rag_runs
   (session_id, created_at, query, retrieved_count, sources_json, model_name, mode, duration_ms,
    input_tokens, output_tokens, outcome, answer)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-const searchSql = database.prepare(`SELECT k.id, k.title, k.content, k.category,
-    k.source_title, k.source_url, k.product_id,
+const searchProductSql = database.prepare(`SELECT k.id, k.title, k.content, k.category,
+    k.source_title, k.source_url, k.product_id, k.guide_key AS guide_id, p.attributes_json,
     bm25(knowledge_fts, 8.0, 5.0, 2.0, 1.2) AS rank,
     p.price_brl
   FROM knowledge_fts JOIN knowledge_chunks k ON k.id = knowledge_fts.rowid
   LEFT JOIN products p ON p.id = k.product_id
-  WHERE knowledge_fts MATCH ? AND (p.id IS NULL OR p.in_stock = 1)
+    WHERE knowledge_fts MATCH ? AND p.id IS NOT NULL AND p.in_stock = 1
+    AND (? IS NULL OR (p.price_brl IS NOT NULL AND p.price_brl <= ?))
+    AND (? IS NULL OR p.category_key = ?)
+  ORDER BY rank ASC LIMIT ?`);
+const searchGuideSql = database.prepare(`SELECT k.id, k.title, k.content, k.category,
+    k.source_title, k.source_url, k.product_id, k.guide_key AS guide_id, NULL AS attributes_json,
+    bm25(knowledge_fts, 8.0, 5.0, 2.0, 1.2) AS rank,
+    NULL AS price_brl
+  FROM knowledge_fts JOIN knowledge_chunks k ON k.id = knowledge_fts.rowid
+  WHERE knowledge_fts MATCH ? AND k.product_id IS NULL AND k.guide_key IS NOT NULL
   ORDER BY rank ASC LIMIT ?`);
 
 const synonyms = new Map([
@@ -297,10 +334,6 @@ export function searchCatalog(query, topK = 6, filterQuery = query, categoryCont
   const original = normalized.match(/[a-z0-9]+/g) || [];
   const terms = [...new Set(original.flatMap(tokenToSearch))];
   if (terms.length === 0) return [];
-  let documents;
-  try { documents = searchSql.all(terms.join(' OR '), 80); }
-  catch { return []; }
-
   const budgetText = filterQuery.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const budgetMatch = budgetText.match(/(?:ate|maximo|orcamento|budget)\s*(?:de)?\s*(?:r\$)?\s*([0-9.]+(?:,[0-9]{1,2})?|[0-9]{3,6})(?:\s*mil)?/);
   const fallbackBudget = budgetText.match(/(?:r\$\s?)([0-9.]+(?:,[0-9]{1,2})?)(?:\s*mil)?/);
@@ -308,18 +341,39 @@ export function searchCatalog(query, topK = 6, filterQuery = query, categoryCont
   const budget = Number((budgetMatch?.[1] || fallbackBudget?.[1] || '').replaceAll('.', '').replace(',', '.')) * (budgetIsMil ? 1000 : 1);
   const detectCategory = (text) => {
     const q = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    if (/\b(pc|computador|computadores|desktop)\b/.test(q)) return 'pc gamer';
-    if (/\b(headset|headsets|fone|fones)\b/.test(q)) return 'headset';
-    if (/\b(teclado|teclados)\b/.test(q)) return 'teclado';
-    if (/\b(mouse|mouses)\b/.test(q)) return 'mouse';
-    if (/\b(caixa|caixas|soundbar|som)\b/.test(q)) return 'caixa de som';
-    return null;
+    // A component explicitly named by the user outranks broad words such as "PC".
+    const rules = [
+      ['armazenamentoExterno', /\b(pendrive|externo|cartao de memoria)\b/],
+      ['armazenamento', /\b(ssd|nvme|sata|hd|disco|armazenamento)\b/],
+      ['memoria', /\b(ram|memoria)\b/],
+      ['coolerParaProcessador', /\b(cooler|water cooler)\b/],
+      ['processador', /\b(processador|cpu|ryzen|intel core)\b/],
+      ['placaMae', /\b(placa mae|motherboard)\b/],
+      ['placaDeVideo', /\b(placa de video|gpu|rtx|gtx|geforce|radeon)\b/],
+      ['fonte', /\b(fonte|psu)\b/],
+      ['gabinete', /\b(gabinete|case)\b/],
+      ['fanParaGabinete', /\b(ventoinha|fan)\b/],
+      ['monitor', /\b(monitor|tela)\b/],
+      ['teclado', /\b(teclado)\b/],
+      ['headset', /\b(headset|fone)\b/],
+      ['mousepad', /\b(mousepad)\b/],
+      ['mouse', /\b(mouse)\b/],
+      ['adaptadorWifi', /\b(wifi|wi-fi|adaptador sem fio)\b/],
+      ['kitGamer', /\b(kit gamer|kit teclado e mouse)\b/],
+    ];
+    return rules.find(([, pattern]) => pattern.test(q))?.[0] || null;
   };
   const categoryFilter = detectCategory(filterQuery) || detectCategory(categoryContext);
-  if (categoryFilter === 'pc gamer') documents = documents.filter((doc) => doc.category.toLowerCase().startsWith('pc gamer'));
-  else if (categoryFilter) documents = documents.filter((doc) => doc.category.toLowerCase().includes(categoryFilter));
-  if (budget > 0) documents = documents.filter((doc) => Number.isFinite(doc.price_brl) && doc.price_brl <= budget);
   const boundedK = Math.min(Math.max(topK, 1), 12);
+  let documents;
+  try {
+    documents = searchProductSql.all(terms.join(' OR '), budget > 0 ? budget : null, budget > 0 ? budget : null,
+      categoryFilter, categoryFilter, Math.max(80, boundedK)); }
+  catch { return []; }
+  if (isHardwareGuideQuery(filterQuery)) {
+    try { documents.push(...searchGuideSql.all(terms.join(' OR '), 20)); }
+    catch { /* Guide retrieval is optional; catalog retrieval remains available. */ }
+  }
   return documents.sort((a, b) => a.rank - b.rank).slice(0, boundedK);
 }
 

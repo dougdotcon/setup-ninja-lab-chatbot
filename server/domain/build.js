@@ -33,7 +33,9 @@ function ramChoice(products, board, cpu, targetGB, exceptions, requiredId = null
 }
 
 function cheapestCompatible(list, test) {
-  return sorted(list).find(test) || null;
+  // Callers pass byCategory() results, already sorted by official price; sorting
+  // this same list inside every CPU/board/GPU combination made a chat build take minutes.
+  return list.find(test) || null;
 }
 
 /** Creates bounded complete candidates; every price and stock value comes from the official snapshot. */
