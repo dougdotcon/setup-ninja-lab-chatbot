@@ -246,7 +246,7 @@ function localBuildExplanation(candidate, request, budgetCents) {
   const lines = summary.items.map((part) => `${part.quantity > 1 ? `${part.quantity}× ` : ''}${part.name} — ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(part.totalPriceCents / 100)}`);
   const unknown = candidate.unknownRules.length ? `\n\nItens sem dados suficientes: ${candidate.unknownRules.join(', ')}. Confira encaixe físico, BIOS, conectores e detalhes antes da compra.` : '';
   const fmt = (cents) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
-  return `NinjaRUDEUS montou uma sugestão com itens em estoque no snapshot oficial. ${request ? `Missão: ${request.slice(0, 180)}. ` : ''}\n\n${lines.join('\n')}\n\nTotal do catálogo: ${fmt(candidate.totalPriceCents)}${Number.isFinite(budgetCents) ? ` (limite ${fmt(budgetCents)}).` : '.'}${unknown}\n\nCompatibilidade: ${candidate.compatibility.status}. “Desconhecido” quer dizer que faltam dados publicados; não é uma garantia de encaixe.`;
+  return `NinjaRUDEUS montou uma sugestão com itens em estoque no snapshot oficial. ${request ? `Missão: ${redact(request).slice(0, 180)}. ` : ''}\n\n${lines.join('\n')}\n\nTotal do catálogo: ${fmt(candidate.totalPriceCents)}${Number.isFinite(budgetCents) ? ` (limite ${fmt(budgetCents)}).` : '.'}${unknown}\n\nCompatibilidade: ${candidate.compatibility.status}. “Desconhecido” quer dizer que faltam dados publicados; não é uma garantia de encaixe.`;
 }
 
 async function askJevToChoose(config, request, requirements, candidates) {
@@ -530,9 +530,10 @@ app.post('/api/build', originGuard, useSession, rateLimit(5), async (req, res) =
         ? error.message : 'provider-error' }; }
   }
   if (referenceBudget) explanation = `Você não informou um teto. Usei R$ ${budgetValue.toLocaleString('pt-BR')} apenas como referência inicial; posso ajustar a montagem ao seu orçamento.\n\n${explanation}`;
+  explanation = redact(explanation);
   const buildId = randomBytes(16).toString('hex');
-  try { saveBuild({ id: buildId, sessionId: req.sessionId, candidate: selected, budgetCents, purpose: requirements.purpose,
-    requirements, decision, generation, explanation }); }
+  try { saveBuild({ id: buildId, sessionId: req.sessionId, request: redact(request), candidate: selected, budgetCents, purpose: requirements.purpose,
+    requirements, interpretation, decision, generation, explanation }); }
   catch { return res.status(503).json({ error: 'Não consegui persistir a montagem na sessão. Tente outra vez.' }); }
   const durationMs = Math.round(performance.now() - started);
   const changedParts = previousBuild ? ['processor', 'motherboard', 'memory', 'graphicsCard', 'powerSupply', 'case', 'storage', 'cooler'].filter((key) => {

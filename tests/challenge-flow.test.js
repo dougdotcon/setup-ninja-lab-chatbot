@@ -144,7 +144,11 @@ test('literal challenge journeys preserve official stock, constraints and sessio
   const b = await session();
   assert.notEqual(a, b);
   assert.equal((await api(b, '/api/build/history')).data.builds.length, 0);
-  assert.equal((await api(a, '/api/build/history')).data.builds.length, 4);
+  const buildHistory = (await api(a, '/api/build/history')).data.builds;
+  assert.equal(buildHistory.length, 4);
+  assert.equal(buildHistory[0].request_text, 'Monte um PC com uma RTX 5070.');
+  assert.ok(buildHistory[0].explanation.includes('NinjaRUDEUS'));
+  assert.equal(buildHistory[0].generation.called, false);
   assert.equal((await api(refinementSession, '/api/build/history')).data.builds.length, 2);
   const offTopic = await api(b, '/api/chat', { message: 'Qual a melhor receita de bolo de chocolate?' });
   assert.equal(offTopic.status, 200);
@@ -157,6 +161,9 @@ test('literal challenge journeys preserve official stock, constraints and sessio
   assert.equal(rag.status, 200);
   assert.ok(rag.data.telemetry.retrieved > 0);
   assert.ok(rag.data.citations.every((item) => official.get(item.productId)?.inStock));
+  const ragRuns = (await api(b, '/api/chat/runs')).data.runs;
+  assert.equal(ragRuns.length, 3);
+  assert.equal(ragRuns[0].answer, rag.data.answer);
 
   const modelSession = await session();
   const configured = await api(modelSession, '/api/model/config', { provider: 'ollama', baseUrl: `http://127.0.0.1:${modelPort}/v1`, model: 'local-test' });
@@ -168,6 +175,10 @@ test('literal challenge journeys preserve official stock, constraints and sessio
   assert.equal(modelBuild.generation.called, true);
   assert.equal(modelBuild.generation.fallback, false, JSON.stringify({ generation: modelBuild.generation, mockCalls: mockCalls.length }));
   assert.equal(modelBuild.telemetry.modelWasActuallyCalled, true);
+  const [modelTrace] = (await api(modelSession, '/api/build/history')).data.builds;
+  assert.equal(modelTrace.generation.called, true);
+  assert.equal(modelTrace.interpretation.called, true);
+  assert.equal(modelTrace.explanation, modelBuild.selected.explanation);
   assert.ok(mockCalls.some((call) => call.response_format?.type === 'json_object'));
   assert.ok(mockCalls.some((call) => !call.response_format));
 

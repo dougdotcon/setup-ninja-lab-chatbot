@@ -68,7 +68,8 @@ database.exec(`
     id INTEGER PRIMARY KEY, session_id TEXT NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
     created_at TEXT NOT NULL, query TEXT NOT NULL, retrieved_count INTEGER NOT NULL,
     sources_json TEXT NOT NULL, model_name TEXT NOT NULL, mode TEXT NOT NULL,
-    duration_ms INTEGER NOT NULL, input_tokens INTEGER, output_tokens INTEGER, outcome TEXT NOT NULL
+    duration_ms INTEGER NOT NULL, input_tokens INTEGER, output_tokens INTEGER, outcome TEXT NOT NULL,
+    answer TEXT NOT NULL DEFAULT ''
   );
   CREATE INDEX IF NOT EXISTS idx_products_category ON product_categories(category_id, product_id);
   CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id, created_at);
@@ -102,7 +103,9 @@ database.exec(`
     budget_cents INTEGER, purpose TEXT NOT NULL, requirements_json TEXT NOT NULL, parts_json TEXT NOT NULL,
     compatibility_json TEXT NOT NULL, decision_provider TEXT NOT NULL, decision_model TEXT NOT NULL,
     decision_confidence REAL, decision_fallback INTEGER NOT NULL, generation_provider TEXT NOT NULL,
-    generation_model TEXT NOT NULL, explanation TEXT NOT NULL
+    generation_model TEXT NOT NULL, explanation TEXT NOT NULL, request_text TEXT NOT NULL DEFAULT '',
+    interpretation_json TEXT NOT NULL DEFAULT '{}', generation_json TEXT NOT NULL DEFAULT '{}',
+    decision_json TEXT NOT NULL DEFAULT '{}'
   );
   CREATE TABLE IF NOT EXISTS pc_build_parts (
     build_id TEXT NOT NULL REFERENCES pc_builds(id) ON DELETE CASCADE, product_id TEXT NOT NULL,
@@ -114,6 +117,10 @@ database.exec(`
 `);
 ensureColumn('catalog_sync_runs', 'in_stock_listings', 'INTEGER NOT NULL DEFAULT 0');
 ensureColumn('catalog_sync_runs', 'out_of_stock_listings', 'INTEGER NOT NULL DEFAULT 0');
+ensureColumn('rag_runs', 'answer', "TEXT NOT NULL DEFAULT ''");
+for (const [column, definition] of Object.entries({ request_text: "TEXT NOT NULL DEFAULT ''",
+  interpretation_json: "TEXT NOT NULL DEFAULT '{}'", generation_json: "TEXT NOT NULL DEFAULT '{}'",
+  decision_json: "TEXT NOT NULL DEFAULT '{}'" })) ensureColumn('pc_builds', column, definition);
 
 const catalogSnapshotPath = path.join(projectRoot, 'data/catalog-api.snapshot.json');
 const catalogRun = database.prepare(`INSERT INTO catalog_sync_runs
@@ -249,8 +256,8 @@ const insertMessage = database.prepare(
 );
 const insertRagRun = database.prepare(`INSERT INTO rag_runs
   (session_id, created_at, query, retrieved_count, sources_json, model_name, mode, duration_ms,
-   input_tokens, output_tokens, outcome)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+   input_tokens, output_tokens, outcome, answer)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 const searchSql = database.prepare(`SELECT k.id, k.title, k.content, k.category,
     k.source_title, k.source_url, k.product_id,
     bm25(knowledge_fts, 8.0, 5.0, 2.0, 1.2) AS rank,
@@ -333,12 +340,12 @@ export function recordInteraction({ sessionId, query, answer, sources = [], mode
   }));
   insertRagRun.run(sessionId, now, scrub(query), loggedSources.length,
     JSON.stringify(loggedSources), scrub(model), mode, Math.max(0, Math.round(durationMs)),
-    inputTokens, outputTokens, outcome);
+    inputTokens, outputTokens, outcome, scrub(answer));
 }
 
 export function getSessionRuns(sessionId, limit = 30) {
   return database.prepare(`SELECT id, created_at, query, retrieved_count, sources_json,
-      model_name, mode, duration_ms, input_tokens, output_tokens, outcome
+      model_name, mode, duration_ms, input_tokens, output_tokens, outcome, answer
     FROM rag_runs WHERE session_id = ? ORDER BY id DESC LIMIT ?`).all(sessionId, limit)
     .map((run) => ({ ...run, sources: JSON.parse(run.sources_json), sources_json: undefined }));
 }
@@ -402,13 +409,13 @@ export function getOfficialBuildData() {
   return { products: [...byId.values()], exceptions };
 }
 
-export function saveBuild({ id, sessionId, candidate, budgetCents, purpose, requirements, decision, generation, explanation }) {
+export function saveBuild({ id, sessionId, request, candidate, budgetCents, purpose, requirements, interpretation, decision, generation, explanation }) {
   const createdAt = new Date().toISOString();
   const insert = database.prepare(`INSERT INTO pc_builds
     (id, session_id, created_at, total_price_cents, budget_cents, purpose, requirements_json, parts_json,
      compatibility_json, decision_provider, decision_model, decision_confidence, decision_fallback,
-     generation_provider, generation_model, explanation)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+     generation_provider, generation_model, explanation, request_text, interpretation_json, generation_json, decision_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const insertPart = database.prepare(`INSERT INTO pc_build_parts (build_id, product_id, category_key, quantity, unit_price_cents)
     VALUES (?, ?, ?, ?, ?)`);
   database.exec('BEGIN IMMEDIATE');
@@ -416,7 +423,8 @@ export function saveBuild({ id, sessionId, candidate, budgetCents, purpose, requ
     insert.run(id, sessionId, createdAt, candidate.totalPriceCents, budgetCents ?? null, purpose,
       JSON.stringify(requirements), JSON.stringify(candidate.parts), JSON.stringify(candidate.compatibility),
       decision.provider, decision.model, decision.confidence ?? null, decision.fallback ? 1 : 0,
-      generation.provider, generation.model, explanation);
+      generation.provider, generation.model, explanation, String(request || '').slice(0, 900),
+      JSON.stringify(interpretation), JSON.stringify(generation), JSON.stringify(decision));
     for (const value of Object.values(candidate.parts)) for (const part of Array.isArray(value) ? value : value ? [value] : []) {
       insertPart.run(id, String(part.id), part.categoryKeys?.[0] || part.category, Number(part.quantity || 1), Number(part.priceCents));
     }
@@ -428,11 +436,15 @@ export function saveBuild({ id, sessionId, candidate, budgetCents, purpose, requ
 export function getSessionBuilds(sessionId, limit = 30) {
   return database.prepare(`SELECT id, created_at, total_price_cents, budget_cents, purpose,
     requirements_json, parts_json, compatibility_json, decision_provider, decision_model,
-    decision_confidence, decision_fallback, generation_provider, generation_model, explanation
+    decision_confidence, decision_fallback, generation_provider, generation_model, explanation,
+    request_text, interpretation_json, generation_json, decision_json
     FROM pc_builds WHERE session_id=? ORDER BY created_at DESC LIMIT ?`).all(sessionId, limit).map((row) => ({
       ...row, requirements: JSON.parse(row.requirements_json), parts: JSON.parse(row.parts_json),
-      compatibility: JSON.parse(row.compatibility_json), requirements_json: undefined, parts_json: undefined,
-      compatibility_json: undefined, decision_fallback: Boolean(row.decision_fallback),
+      compatibility: JSON.parse(row.compatibility_json), interpretation: JSON.parse(row.interpretation_json),
+      generation: JSON.parse(row.generation_json), decision: JSON.parse(row.decision_json),
+      requirements_json: undefined, parts_json: undefined, compatibility_json: undefined,
+      interpretation_json: undefined, generation_json: undefined, decision_json: undefined,
+      decision_fallback: Boolean(row.decision_fallback),
     }));
 }
 

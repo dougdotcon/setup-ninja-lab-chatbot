@@ -207,7 +207,6 @@ function Hero({ onChooseCategory }) {
       </div>
       <div className="hero-art">
         <span className="hero-aura" aria-hidden="true" />
-        <span className="hero-circuit" aria-hidden="true" />
         <span className="hero-orbit orbit-one" aria-hidden="true" />
         <span className="hero-orbit orbit-two" aria-hidden="true" />
         <span className="hero-pixel pixel-one" aria-hidden="true" />
@@ -675,7 +674,22 @@ function ModelPanel({ session, onConnected, onRefreshRuns }) {
 function RunsPanel() {
   const [runs, setRuns] = useState([]);
   const [failure, setFailure] = useState('');
-  const load = () => api('/api/chat/runs').then((data) => { setRuns(data.runs); setFailure(''); }).catch((error) => setFailure(error.message));
+  const load = () => Promise.all([api('/api/chat/runs'), api('/api/build/history')]).then(([rag, history]) => {
+    const builds = history.builds.map((build) => ({
+      id: `build-${build.id}`, created_at: build.created_at, query: build.request_text || 'Montagem anterior',
+      kind: 'build', mode: build.generation?.called && !build.generation?.fallback ? 'montagem · LLM' : 'montagem · local',
+      model_name: build.generation_model, answer: build.explanation, outcome: build.compatibility.status,
+      sources: Object.values(build.parts).flatMap((value) => Array.isArray(value) ? value : value ? [value] : [])
+        .map((part) => ({ id: part.id, title: part.name, category: part.categoryName || part.category,
+          url: part.productUrl || part.sourceUrl, score: null })),
+      retrieved_count: Object.values(build.parts).flatMap((value) => Array.isArray(value) ? value : value ? [value] : []).length,
+      input_tokens: build.generation?.inputTokens ?? null, output_tokens: build.generation?.outputTokens ?? null,
+      interpretation: build.interpretation, decision: build.decision, generation: build.generation,
+    }));
+    setRuns([...rag.runs.map((run) => ({ ...run, kind: 'rag' })), ...builds]
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)).slice(0, 30));
+    setFailure('');
+  }).catch((error) => setFailure(error.message));
   useEffect(() => {
     load();
     window.addEventListener('ninja-runs-changed', load);
@@ -686,31 +700,37 @@ function RunsPanel() {
     <div className="panel-content runs-content">
       <div className="panel-intro">
         <span className="panel-icon"><Activity size={18} /></span>
-        <span><h2>Execuções do RAG</h2><p>Buscas, fontes e respostas desta sessão.</p></span>
+        <span><h2>Execuções e respostas</h2><p>Busca RAG e montagens desta sessão.</p></span>
         <button className="panel-close" onClick={() => window.dispatchEvent(new Event('close-inspector'))} aria-label="Fechar painel"><X size={17} /></button>
       </div>
       <div className="runs-metrics">
-        <div><strong>{runs.length}</strong><span>BUSCAS NESTA SESSÃO</span></div>
+        <div><strong>{runs.length}</strong><span>EXECUÇÕES NA SESSÃO</span></div>
         <div><strong>{modes.length || '0'}</strong><span>MODOS ATIVADOS</span></div>
         <button onClick={load} aria-label="Atualizar execuções"><ArrowDownUp size={16} /></button>
       </div>
-      <div className="panel-section-heading"><h3>TRILHA DE RECUPERAÇÃO</h3><span>JANELA DE 24 HORAS</span></div>
+      <div className="panel-section-heading"><h3>TRILHA DE ATENDIMENTO</h3><span>JANELA DE 24 HORAS</span></div>
       {failure ? <div className="inline-error">{failure}</div> : null}
       {runs.length ? (
         <div className="run-list">
           {runs.map((run) => (
             <article className="run-item" key={run.id}>
-              <div className="run-dot-line"><span className={'run-dot ' + (run.mode.includes('fallback') ? 'warn' : 'ok')} /><i /></div>
+              <div className="run-dot-line"><span className={'run-dot ' + (run.mode.includes('fallback') || run.outcome === 'FAIL' ? 'warn' : 'ok')} /><i /></div>
               <div className="run-details">
                 <div className="run-heading"><time>{new Date(run.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</time><span>{run.mode}</span></div>
                 <h4>{run.query}</h4>
-                <p>Seleção do índice <b>FTS5 · BM25</b><span> · {run.retrieved_count} fonte(s)</span><span> · {run.duration_ms} ms</span></p>
+                <p>{run.kind === 'rag' ? <>Busca <b>FTS5 · BM25</b> · {run.retrieved_count} fonte(s) · {run.duration_ms} ms</>
+                  : <>Montagem <b>validada no catálogo</b> · {run.retrieved_count} SKU(s) · {run.outcome}</>}</p>
+                {run.kind === 'build' ? <p className="run-model-line">Interpretação: {run.interpretation?.called ? run.interpretation.model : 'filtros locais'} · Decisão: {run.decision?.provider || 'ranking local'} · Resposta: {run.generation?.called && !run.generation?.fallback ? run.generation.model : 'prévia local'}</p> : null}
                 {run.retrieved_count ? <details className="source-accordion">
-                  <summary>Visualizar fontes e relevância <ChevronDown size={13} /></summary>
+                  <summary>{run.kind === 'rag' ? 'Ver fontes e relevância' : 'Ver SKUs oficiais'} <ChevronDown size={13} /></summary>
                   <ul>{run.sources.map((source, index) => <li key={source.url + index}>
                     <a href={source.url} target="_blank" rel="noreferrer"><span>{index + 1}</span>{source.title || 'Fonte catalogada'}<ArrowRight size={11} /></a>
-                    <small>{source.category} · BM25 {source.score}</small>
+                    <small>{source.category}{run.kind === 'rag' ? ` · BM25 ${source.score}` : ' · catálogo oficial'}</small>
                   </li>)}</ul>
+                </details> : null}
+                {run.answer ? <details className="source-accordion">
+                  <summary>Ver resposta produzida <ChevronDown size={13} /></summary>
+                  <p className="run-answer">{run.answer}</p>
                 </details> : null}
                 {run.input_tokens != null || run.output_tokens != null ? <span className="token-pair">tokens · entrada {run.input_tokens ?? '—'} / saída {run.output_tokens ?? '—'}</span> : null}
               </div>
@@ -718,7 +738,7 @@ function RunsPanel() {
           ))}
         </div>
       ) : (
-        <div className="empty-runs"><span><Network size={20} /></span><h3>Nenhuma pergunta chegou ao banco.</h3><p>Faça uma pergunta no chat e veja aqui os documentos que o RAG consultou, a resposta e o tempo de busca.</p><button onClick={() => window.dispatchEvent(new Event('open-ninja-chat'))}>Abrir o NinjaRUDEUS <ArrowRight size={14} /></button></div>
+        <div className="empty-runs"><span><Network size={20} /></span><h3>Nenhuma execução nesta sessão.</h3><p>Converse com o NinjaRUDEUS ou monte um PC para ver as fontes, os SKUs, o modelo usado e a resposta.</p><button onClick={() => window.dispatchEvent(new Event('open-ninja-chat'))}>Abrir o NinjaRUDEUS <ArrowRight size={14} /></button></div>
       )}
       <div className="telemetry-note">
         <div><ShieldCheck size={14} /><span>Isolamento por sessão · 24 horas</span></div>
