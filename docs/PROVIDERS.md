@@ -13,7 +13,7 @@ O backend usa `POST {baseUrl}/chat/completions`. OpenAI, Ollama e LM Studio rece
 
 O campo de modelo precisa receber o ID informado pelo runtime/provedor; os exemplos da interface não instalam modelos. Confirme conectividade com **Testar conexão** antes de conversar. Consulte as documentações oficiais de [Ollama](https://docs.ollama.com/api/openai-compatibility) e [LM Studio](https://lmstudio.ai/docs/developer/openai-compat).
 
-O timeout padrão é de 60 s para endpoints locais e 25 s para remotos. `SETUPNINJA_LLM_TIMEOUT_MS` substitui o padrão com um valor entre 5.000 e 120.000 ms. Chaves ficam somente na memória da sessão por até uma hora. Desconectar ou reiniciar remove essa configuração. URLs remotas exigem HTTPS público, sem redirects nem parâmetros de autenticação no URL. Endpoints locais usam a allowlist `SETUPNINJA_LOCAL_LLM_URLS` do Compose.
+O proxy HTTPS publicado e `deploy/setupninja.nginx` permitem 300 s de leitura, cobrindo interpretação e geração sequenciais sem encerrar antes do fallback. O timeout padrão por chamada de modelo é de 60 s para endpoints locais e 25 s para remotos. `SETUPNINJA_LLM_TIMEOUT_MS` substitui o padrão com um valor entre 5.000 e 120.000 ms. Chaves ficam somente na memória da sessão por até uma hora. Desconectar ou reiniciar remove essa configuração. URLs remotas exigem HTTPS público, sem redirects nem parâmetros de autenticação no URL. Endpoints locais usam a allowlist `SETUPNINJA_LOCAL_LLM_URLS` do Compose.
 
 ## A máquina local e o contêiner
 
@@ -57,3 +57,5 @@ node scripts/verify-local-provider.mjs
 Para LM Studio, use `SETUPNINJA_VALIDATE_PROVIDER=lmstudio`, base `http://host.docker.internal:1234/v1` e o ID carregado no servidor. O script conecta sessões temporárias, consulta a API oficial, valida SKUs/estoque/quantidades/centavos/tetos, executa os cenários literais do desafio e o refinamento NVIDIA preservando 32 GB. Também exige um guia RAG respondido pelo modelo e recusa fora do escopo após contexto técnico. Ao final desconecta cada sessão e salva `/tmp/setupninja-real-llm-report.json`, ou o caminho definido em `SETUPNINJA_VALIDATE_REPORT`.
 
 O teste só passa se existir ao menos uma interpretação e uma geração estruturada aceitas pelo runtime real, além de todos os cenários canônicos aprovados. Um modelo pequeno pode acionar fallback nos demais casos; essa condição fica registrada, nunca é contada como resposta aceita do modelo. O relatório não contém cookies nem chaves. Runtimes temporários usados na avaliação são removidos ao fim; a aplicação permanece sem chave e sem modelo padrão.
+
+A [avaliação de 03/10/2026](EVALUATION.md) aprovou nove cenários com Ollama 0.35.1 e Qwen2.5 0.5B. O runtime temporário foi removido; conecte seu runtime para voltar a usar inferência. A preferência de família de CPU só vira filtro quando aparece no pedido; refinamentos de GPU preservam CPU e RAM anteriores.

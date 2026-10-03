@@ -1,6 +1,6 @@
 # Matriz de aceitação do desafio
 
-Esta matriz relaciona cada exigência ao comportamento e à evidência reproduzível. Em 03/10/2026, `npm test` passou com 27/27 testes em 92,2 s e `npm run lint` passou; depois, o caso HTTP focado passou com 1/1 em 44,5 s. Os detalhes estão em `EVALUATION.md`. A validação real de modelo, sem credenciais, é opt-in com `node scripts/verify-local-provider.mjs`; consulte `PROVIDERS.md`. A primeira montagem gamer com Ollama real teve interpretação aceita e geração sem fallback (R$ 4.739,91); os demais casos e a aceitação completa continuam pendentes do relatório.
+Esta matriz relaciona cada exigência ao comportamento e à evidência reproduzível. A verificação final de 03/10/2026 aprovou **28/28 testes**, lint e build Docker, além de **9/9 cenários com Ollama real**, seis interpretações e seis gerações aceitas. Os fluxos desktop/mobile foram verificados no navegador. Veja [resultados e limites](EVALUATION.md) e o [relatório de inferência real](verification/ollama-acceptance.json). A conexão real permanece opt-in, sem chaves incluídas; consulte `PROVIDERS.md`.
 
 | Requisito | Implementação e evidência |
 |---|---|
@@ -44,7 +44,7 @@ Esta matriz relaciona cada exigência ao comportamento e à evidência reproduz�
 | NinjaRUDEUS em contexto | Escopo, recusa fora de hardware, guias com fontes e persona no renderer; testes de follow-up e prompt injection. |
 | Identidade, carrinho e montador | `DESIGN.md` e `UX.md` descrevem referência, defeitos observados e verificação do fluxo. |
 | Documentação e diagramas | README e documentos em `docs/`, com Mermaid de componentes, sequência e RAG. |
-| Verificação da demonstração | Fluxos de carrinho, montagem, SQLite e conexão local observados no navegador, sem erros no console; o grid em 390 px teve corte lateral corrigido, com confirmação visual após rebuild final ainda pendente. |
+| Verificação da demonstração | Fluxos de carrinho, montagem, SQLite e conexão local observados no navegador, sem erros no console; o grid em 390 px foi corrigido e confirmado: painéis de 368 px dentro da tela. |
 | Commits por etapa e autoria | Histórico Git publicado no repositório, autoria dougdotcon corrigida com autorização e datas preservadas. |
 
 ## Limites da avaliação

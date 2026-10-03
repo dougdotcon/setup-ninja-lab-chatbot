@@ -1,5 +1,31 @@
 # Avaliação e histórico
 
+## Validação final — 03/10/2026
+
+A suíte final passou com **28/28 testes em 54,70 s**, incluindo as regressões encontradas na inferência real e o roteamento de instruções de hardware para RAG. `npm run lint`, `git diff --check` e o build Docker passaram. O teste HTTP verifica os pedidos literais, estoque, quantidades, preços em centavos, teto, sessões, contexto, SKUs fixos, respostas inválidas e provedores locais simulados. As regressões incluem AM4→AM5, CPU AM5 + placa-mãe AM4 fixadas retornando 422, seleção manual de Intel e sugestões válidas em JSON porém não solicitadas pelo cliente.
+
+A inferência real foi executada na aplicação HTTPS publicada com **Ollama 0.35.1**, modelo **Qwen2.5 0.5B** (alias temporário `setupninja-validation`, dois threads e contexto de 2.048 tokens). Entre 19:59:47 e 20:02:04 UTC, o script aprovou **9/9 cenários**, com **seis interpretações e seis gerações aceitas**, sem fallback nas montagens contabilizadas. Veja o [relatório completo sem cookies ou credenciais](verification/ollama-acceptance.json).
+
+| Cenário real | Resultado | Total / evidência |
+|---|---|---|
+| gamer-5000 | Passou | R$ 4.235,20 |
+| sem-intel-1440p | Passou | R$ 6.764,60 |
+| prioridade-gpu | Passou | R$ 6.899,48 |
+| ryzen7-edicao-sem-teto | Passou | R$ 7.557,03 |
+| rtx5070-sem-teto | Passou | R$ 11.679,90 |
+| refinamento-preserva32 | Passou | R$ 5.104,61 |
+| rtx5070-orcamento-impossivel | Passou | HTTP 422: orçamento impossível |
+| guia-hardware-rag | Passou | Guia Kingston citado, modelo chamado |
+| follow-up-fora-escopo | Passou | Fora do escopo; sem chamada ao modelo |
+
+O guia de RAM levou 4.002 ms, usou 307 tokens de entrada/19 de saída e citou a documentação Kingston. O follow-up sobre bolo recuperou zero fontes e não chamou o modelo. Todas as montagens foram comparadas aos IDs, quantidades, estoque e preços da API oficial; nenhuma apresentou incompatibilidade conhecida `FAIL`. Dados faltantes continuam `UNKNOWN`, visíveis como “Pendente de conferência”. Esses números são uma captura de avaliação, não uma oferta ou promessa de desempenho.
+
+A primeira execução real revelou uma família Ryzen 7 não solicitada e um timeout HTTP do proxy. O servidor passou a ignorar preferências de CPU sem âncora no pedido e a preservar CPU/RAM durante refinamento de GPU. O proxy do subdomínio foi alinhado ao limite das chamadas locais (`proxy_read_timeout 300s`); `nginx -t` passou. O classificador de instruções recebe apenas os guias recuperados. A execução acima é a repetição aprovada após essas correções.
+
+Desktop e celular confirmaram carrinho separado, quantidades, subtotal, persistência, Escape/foco, montagem, troca de SSD, estado entre abas e transferência de SKUs à sacola. No viewport de 390 px, os painéis medem 368 px, com borda direita em 379 px; as peças medem 336 px, sem corte lateral. A explicação completa fica em “Por que esta configuração?” e as pendências usam rótulos em português. As [evidências de UX](UX.md) registram o percurso observado no configurador original. SQLite mostrou **17 categorias, 1.236 produtos, 1.241 chunks** e **sete tabelas públicas autorizadas**, incluindo cinco guias. Na sincronização persistida de `2026-10-03T20:47:20.382Z`, eram 747 IDs em estoque e 489 indisponíveis; o snapshot versionado anterior continua descrito separadamente em `CATALOG.md`.
+
+O contêiner/imagem temporários do Ollama foram removidos depois do teste. A aplicação segue em Docker, com volume SQLite persistente, HTTPS e sem chave ou modelo conectado por padrão. O backend e os módulos compartilhados da imagem publicada foram comparados por SHA-256 aos arquivos testados.
+
 ## Cenários verificáveis
 
 `npm test` executa testes de domínio e um percurso HTTP isolado, usando o snapshot público versionado. O percurso usa um servidor OpenAI-compatible simulado em `127.0.0.1`, sem credenciais. Para cada montagem, compara SKUs, quantidade, preço e total com o catálogo oficial, confirma estoque e ausência de regra `FAIL`, além de testar memória de sessão, RAG, escopo e fallback. A suíte também testa normalização, deduplicação, sockets, RAM, PFC, cooler, dimensões, orçamento, Jev com escolha fechada e prevenção de retrocesso do SQLite quando o snapshot embutido é mais antigo.
@@ -25,9 +51,9 @@
 
 Esses valores são da captura de 02/10/2026 e podem divergir do catálogo atual. O teste não mede FPS, não confirma BIOS/forma física completa e não valida uma máquina montada.
 
-## O que não foi conectado/testado
+## Limites das verificações
 
-Nenhuma chave de API foi fornecida. Houve teste real do protocolo OpenAI-compatible por servidor HTTP simulado, mas não uma chamada a OpenAI, Ollama, LM Studio ou Typesafe Jev reais. Os testes não comprovam disponibilidade externa, qualidade do modelo, contagem real de tokens ou uma execução Jev real. Neste host não há runtime local de LLM instalado; cada sessão pode conectar um endpoint permitido. Modo sem credencial é prévia determinística e aparece como tal na interface. A validação de texto do modelo é conservadora e rejeita referências numéricas/modelos sem fonte; texto livre ainda requer avaliação humana para garantias semânticas.
+Não houve inferência real em OpenAI, LM Studio ou Typesafe Jev: não foram fornecidas chaves nem um runtime LM Studio. Esses adaptadores têm contratos simulados e a interface permite conectá-los. A execução real Ollama comprova integração e os cenários descritos; um modelo de 0,5B não é avaliação de qualidade geral para produção. O renderer não entrega prosa arbitrária da LLM: interpretações e planos fechados passam pelos validadores e usam fatos canônicos. Qualidade de interpretação, recall de recuperação, carga de catálogos maiores, compatibilidade física e desempenho exigem avaliações próprias. Sem modelo conectado, a prévia determinística aparece identificada na interface.
 
 ## Início informado e commits locais
 
@@ -56,5 +82,9 @@ O início do trabalho foi informado como **02/10/2026 às 18:25 em `America/Sao_
 | `docs: document verified challenge flows and enable lint` | esta atualização de evidências, arquitetura e análise estática |
 | `578bed6` | trilha por sessão com saídas RAG e montagens, migração SQLite e auditoria na interface |
 | `docs: describe answer audit trail and current official source` | documentação da trilha de respostas e da origem ativa do catálogo |
+| `2041c3b` | schemas JSON estritos por provedor e limites para follow-ups de hardware |
+| `4cedc22` | cenário de guia citado na aceitação real com Ollama |
+| `8da1165` | preservação de escolhas manuais de CPU e revalidação de plataforma |
+| `1c4f4f1` | correção do grid em viewport estreita e rótulos compartilhados de compatibilidade |
 
 O histórico local/tag `demo-v1` mantém a etapa demonstrativa anterior, mas seus produtos não fazem parte do catálogo ativo do montador. Os commits documentais mais recentes podem ser identificados pelo assunto exato em `git log`. O histórico e a tag foram publicados em `dougdotcon/setup-ninja-lab-chatbot`; a atualização de autoria usou `force-with-lease` para proteger alterações remotas concorrentes.
