@@ -1,0 +1,6 @@
+# Use with: docker compose -f compose.yaml -f compose.local.yaml up -d --build
+# HTTP on the developer's machine. The base Compose keeps Secure cookies for HTTPS.
+services:
+  web:
+    environment:
+      COOKIE_SECURE: "false"
